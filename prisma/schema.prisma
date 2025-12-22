@@ -1,0 +1,115 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String?
+  role      String   @default("user") // admin, user
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  organizations Organization[]
+  certificates Certificate[]
+  certificateTemplates CertificateTemplate[]
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  logo        String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  creator User    @relation(fields: [createdBy], references: [id])
+  programs Program[]
+  certificates Certificate[]
+}
+
+model Program {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  organizationId String
+  createdBy      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization Organization @relation(fields: [organizationId], references: [id])
+  certificates Certificate[]
+  studentData  StudentData[]
+}
+
+model CertificateTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  width        Int      @default(794)    // Canvas width in pixels
+  height       Int      @default(1123)   // Canvas height in pixels
+  backgroundColor String   @default("#ffffff") // Background color
+  backgroundImage String?  // Background image URL
+  elements    Json     // Template elements as JSON array
+  isDefault   Boolean  @default(false)
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  creator User         @relation(fields: [createdBy], references: [id])
+  certificates Certificate[]
+  
+  @@index([createdBy])
+  @@index([isDefault])
+  @@index([createdAt])
+}
+
+model Certificate {
+  id                String   @id @default(cuid())
+  certificateId     String   @unique // Public verification ID
+  userName          String   @map("studentName") // Renamed from studentName
+  userEmail         String?  @map("studentEmail") // Renamed from studentEmail
+  issueDate         DateTime @default(now())
+  completionDate    DateTime?
+  verificationCode  String   @unique
+  pdfUrl            String?
+  status            String   @default("issued") // issued, revoked
+  organizationId    String
+  programId         String
+  templateId        String?
+  issuedBy          String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  organization Organization         @relation(fields: [organizationId], references: [id])
+  program      Program              @relation(fields: [programId], references: [id])
+  template     CertificateTemplate? @relation(fields: [templateId], references: [id])
+  issuer       User                 @relation(fields: [issuedBy], references: [id])
+}
+
+model StudentData {
+  id             String   @id @default(cuid())
+  programId      String
+  userName       String   @map("studentName") // Renamed from studentName
+  userEmail      String?  @map("studentEmail") // Renamed from studentEmail
+  completionDate DateTime?
+  additionalData String? // JSON string for additional fields
+  status         String   @default("pending") // pending, processed, failed
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  program Program @relation(fields: [programId], references: [id])
+}
