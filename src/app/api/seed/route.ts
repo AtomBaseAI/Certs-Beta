@@ -31,29 +31,14 @@ export async function POST(request: NextRequest) {
         id: 'default-template',
         name: 'Default Certificate Template',
         description: 'A professional certificate template with standard layout',
-        design: JSON.stringify({
-        width: 1123,
-        height: 794,
-        backgroundColor: "#ffffff",
-        elements: [
-          {
-            id: "certificate-id-default",
-            type: "dynamic-field",
-            x: 923,
-            y: 20,
-            content: "{{certificateId}}",
-            fontSize: 12,
-            color: "#666666",
-            fieldName: "certificateId",
-            isDynamic: true
-          },
+        elements: JSON.stringify([
           {
             id: "title",
             type: "text",
             content: "Certificate of Completion",
-            x: 561,
-            y: 200,
-            fontSize: 36,
+            x: 400,
+            y: 100,
+            fontSize: 32,
             fontWeight: "bold",
             textAlign: "center",
             color: "#1f2937"
@@ -62,74 +47,77 @@ export async function POST(request: NextRequest) {
             id: "subtitle",
             type: "text",
             content: "This is to certify that",
-            x: 561,
-            y: 300,
+            x: 400,
+            y: 200,
             fontSize: 18,
             textAlign: "center",
             color: "#4b5563"
           },
           {
             id: "userName",
-            type: "dynamic-field",
+            type: "text",
             content: "{{userName}}",
-            x: 561,
-            y: 350,
+            x: 400,
+            y: 250,
             fontSize: 24,
             fontWeight: "bold",
             textAlign: "center",
-            color: "#1f2937",
-            fieldName: "userName",
-            isDynamic: true
+            color: "#1f2937"
           },
           {
             id: "programText",
             type: "text",
-            content: "has successfully completed",
-            x: 561,
-            y: 420,
+            content: "has successfully completed the",
+            x: 400,
+            y: 320,
             fontSize: 18,
             textAlign: "center",
             color: "#4b5563"
           },
           {
             id: "programName",
-            type: "dynamic-field",
+            type: "text",
             content: "{{programName}}",
-            x: 561,
-            y: 450,
+            x: 400,
+            y: 350,
             fontSize: 20,
             fontWeight: "bold",
             textAlign: "center",
-            color: "#1f2937",
-            fieldName: "programName",
-            isDynamic: true
+            color: "#1f2937"
           },
           {
             id: "organizationName",
-            type: "dynamic-field",
+            type: "text",
             content: "{{organizationName}}",
-            x: 561,
-            y: 520,
+            x: 400,
+            y: 420,
             fontSize: 16,
             textAlign: "center",
-            color: "#6b7280",
-            fieldName: "organizationName",
-            isDynamic: true
+            color: "#6b7280"
           },
           {
             id: "completionDate",
-            type: "dynamic-field",
+            type: "text",
             content: "{{completionDate}}",
-            x: 561,
-            y: 580,
+            x: 400,
+            y: 480,
             fontSize: 14,
             textAlign: "center",
-            color: "#6b7280",
-            fieldName: "completionDate",
-            isDynamic: true
+            color: "#6b7280"
+          },
+          {
+            id: "border",
+            type: "rectangle",
+            x: 50,
+            y: 50,
+            width: 700,
+            height: 500,
+            strokeColor: "#d1d5db",
+            strokeWidth: 2,
+            fill: "transparent"
           }
-        ]
-      }),
+        ])
+      }
     })
 
     // Create sample organization

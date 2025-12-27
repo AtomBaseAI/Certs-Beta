@@ -20,6 +20,9 @@ interface TemplateElement {
   borderWidth?: number
   imageUrl?: string
   fieldName?: string
+  title?: string
+  hidden?: boolean
+  locked?: boolean
 }
 
 interface TemplateDesign {
@@ -60,6 +63,13 @@ export function DesignCanvas({
 
   const handleMouseDown = useCallback((e: React.MouseEvent, element: TemplateElement) => {
     e.stopPropagation()
+    
+    // Don't allow interaction with locked elements
+    if (element.locked) {
+      onElementSelect(element)
+      return
+    }
+    
     const rect = canvasRef.current?.getBoundingClientRect()
     if (!rect) return
 
@@ -73,6 +83,13 @@ export function DesignCanvas({
 
   const handleResizeMouseDown = useCallback((e: React.MouseEvent, element: TemplateElement, handle: string) => {
     e.stopPropagation()
+    
+    // Don't allow resizing locked elements
+    if (element.locked) {
+      onElementSelect(element)
+      return
+    }
+    
     onElementSelect(element)
     setIsResizing(true)
     setResizeHandle(handle)
@@ -124,6 +141,11 @@ export function DesignCanvas({
   }, [onElementSelect])
 
   const renderElement = (element: TemplateElement) => {
+    // Skip hidden elements
+    if (element.hidden) {
+      return null
+    }
+    
     const isSelected = selectedElement?.id === element.id
     const isResizable = element.type === 'rectangle' || element.type === 'image'
 
@@ -141,8 +163,9 @@ export function DesignCanvas({
       borderColor: element.borderColor,
       borderWidth: element.borderWidth,
       borderStyle: element.borderWidth ? 'solid' : 'none',
-      cursor: isDragging ? 'grabbing' : 'grab',
-      userSelect: 'none'
+      cursor: element.locked ? 'not-allowed' : (isDragging ? 'grabbing' : 'grab'),
+      userSelect: 'none',
+      opacity: element.locked ? 0.7 : 1
     }
 
     const renderContent = () => {
@@ -151,7 +174,7 @@ export function DesignCanvas({
         case 'dynamic-text':
           return (
             <div 
-              className="w-full h-full flex items-center justify-center"
+              className="w-full h-full flex items-center justify-center overflow-hidden"
               style={{
                 textAlign: element.textAlign,
                 color: element.color,
@@ -159,7 +182,9 @@ export function DesignCanvas({
                 fontWeight: element.fontWeight
               }}
             >
-              {element.content}
+              <div className="line-clamp-2 w-full">
+                {element.content || element.title || 'Text'}
+              </div>
             </div>
           )
         case 'rectangle':
@@ -178,7 +203,7 @@ export function DesignCanvas({
           return (
             <img 
               src={element.imageUrl || '/placeholder-image.png'} 
-              alt="Template element"
+              alt={element.title || 'Template element'}
               className="w-full h-full object-cover"
               draggable={false}
             />
@@ -194,14 +219,16 @@ export function DesignCanvas({
         style={elementStyle}
         className={cn(
           'transition-shadow',
-          isSelected && 'ring-2 ring-blue-500 ring-offset-1'
+          isSelected && 'ring-2 ring-blue-500 ring-offset-1',
+          element.locked && 'opacity-70'
         )}
         onMouseDown={(e) => handleMouseDown(e, element)}
+        title={element.title || `${element.type} element`}
       >
         {renderContent()}
         
-        {/* Resize handles for selected element */}
-        {isSelected && isResizable && (
+        {/* Resize handles for selected element (only if not locked) */}
+        {isSelected && isResizable && !element.locked && (
           <>
             <div
               className="absolute w-3 h-3 bg-blue-500 rounded-full -bottom-1 -right-1 cursor-se-resize"
@@ -216,6 +243,13 @@ export function DesignCanvas({
               onMouseDown={(e) => handleResizeMouseDown(e, element, 's')}
             />
           </>
+        )}
+        
+        {/* Lock indicator */}
+        {element.locked && (
+          <div className="absolute top-1 right-1 w-4 h-4 bg-gray-600 rounded-full flex items-center justify-center">
+            <div className="w-2 h-2 bg-white rounded-sm"></div>
+          </div>
         )}
       </div>
     )

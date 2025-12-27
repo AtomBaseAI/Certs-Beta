@@ -16,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { Type, Square, Image as ImageIcon, Hash } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Type, Square, Image as ImageIcon, Hash, Trash2, Eye, EyeOff, Lock, Unlock } from 'lucide-react'
 
 interface TemplateElement {
   id: string
@@ -35,6 +36,9 @@ interface TemplateElement {
   borderWidth?: number
   imageUrl?: string
   fieldName?: string
+  title?: string
+  hidden?: boolean
+  locked?: boolean
 }
 
 interface ElementPropertiesAccordionProps {
@@ -42,13 +46,19 @@ interface ElementPropertiesAccordionProps {
   isSelected: boolean
   onSelect: () => void
   onUpdate: (updates: Partial<TemplateElement>) => void
+  onDelete?: () => void
+  onToggleHide?: () => void
+  onToggleLock?: () => void
 }
 
 export function ElementPropertiesAccordion({
   element,
   isSelected,
   onSelect,
-  onUpdate
+  onUpdate,
+  onDelete,
+  onToggleHide,
+  onToggleLock
 }: ElementPropertiesAccordionProps) {
   const dynamicFields = [
     { value: 'userName', label: 'User Name' },
@@ -70,16 +80,6 @@ export function ElementPropertiesAccordion({
     }
   }
 
-  const getElementName = (type: string) => {
-    switch (type) {
-      case 'text': return 'Text'
-      case 'dynamic-text': return 'Dynamic Text'
-      case 'rectangle': return 'Rectangle'
-      case 'image': return 'Image'
-      default: return 'Element'
-    }
-  }
-
   return (
     <Accordion 
       type="single" 
@@ -88,20 +88,73 @@ export function ElementPropertiesAccordion({
     >
       <AccordionItem 
         value={element.id} 
-        className={`border rounded-lg ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
+        className={`border rounded-lg ${isSelected ? 'ring-2 ring-blue-500' : ''} ${element.hidden ? 'opacity-50' : ''}`}
       >
         <AccordionTrigger 
           onClick={onSelect}
           className="px-3 py-2 hover:no-underline data-[state=open]:bg-gray-50"
         >
-          <div className="flex items-center gap-2 text-sm">
-            {getElementIcon(element.type)}
-            <span className="font-medium">
-              {getElementName(element.type)} {element.id.split('-')[1]}
-            </span>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2 text-sm">
+              {getElementIcon(element.type)}
+              <span className="font-medium truncate">
+                {element.title || getElementName(element.type)}
+              </span>
+              {element.hidden && <EyeOff className="w-3 h-3 text-gray-500" />}
+              {element.locked && <Lock className="w-3 h-3 text-gray-500" />}
+            </div>
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              {onToggleHide && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onToggleHide}
+                  className="h-6 w-6 p-0 hover:bg-gray-100"
+                  title={element.hidden ? 'Show element' : 'Hide element'}
+                >
+                  {element.hidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                </Button>
+              )}
+              {onToggleLock && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onToggleLock}
+                  className="h-6 w-6 p-0 hover:bg-gray-100"
+                  title={element.locked ? 'Unlock element' : 'Lock element'}
+                >
+                  {element.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                </Button>
+              )}
+              {onDelete && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onDelete}
+                  className="h-6 w-6 p-0 hover:bg-red-100 text-red-600"
+                  title="Delete element"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              )}
+            </div>
           </div>
         </AccordionTrigger>
         <AccordionContent className="px-3 pb-3 space-y-3">
+          {/* Title */}
+          <div>
+            <Label htmlFor={`element-title-${element.id}`} className="text-xs">Title</Label>
+            <Input
+              id={`element-title-${element.id}`}
+              value={element.title || ''}
+              onChange={(e) => onUpdate({
+                title: e.target.value
+              })}
+              placeholder="Element title"
+              className="mt-1 h-8"
+            />
+          </div>
+
           {/* Position */}
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -113,6 +166,7 @@ export function ElementPropertiesAccordion({
                 onChange={(e) => onUpdate({
                   x: parseInt(e.target.value) || 0
                 })}
+                disabled={element.locked}
                 className="mt-1 h-8"
               />
             </div>
@@ -125,6 +179,7 @@ export function ElementPropertiesAccordion({
                 onChange={(e) => onUpdate({
                   y: parseInt(e.target.value) || 0
                 })}
+                disabled={element.locked}
                 className="mt-1 h-8"
               />
             </div>
@@ -142,6 +197,7 @@ export function ElementPropertiesAccordion({
                   onChange={(e) => onUpdate({
                     width: parseInt(e.target.value) || 100
                   })}
+                  disabled={element.locked}
                   className="mt-1 h-8"
                 />
               </div>
@@ -154,6 +210,7 @@ export function ElementPropertiesAccordion({
                   onChange={(e) => onUpdate({
                     height: parseInt(e.target.value) || 100
                   })}
+                  disabled={element.locked}
                   className="mt-1 h-8"
                 />
               </div>
@@ -212,6 +269,7 @@ export function ElementPropertiesAccordion({
                     onChange={(e) => onUpdate({
                       fontSize: parseInt(e.target.value) || 16
                     })}
+                    disabled={element.locked}
                     className="mt-1 h-8"
                   />
                 </div>
@@ -248,6 +306,7 @@ export function ElementPropertiesAccordion({
                     onChange={(e) => onUpdate({
                       color: e.target.value
                     })}
+                    disabled={element.locked}
                     className="w-12 h-8 p-1"
                   />
                   <Input
@@ -255,6 +314,7 @@ export function ElementPropertiesAccordion({
                     onChange={(e) => onUpdate({
                       color: e.target.value
                     })}
+                    disabled={element.locked}
                     placeholder="#000000"
                     className="flex-1 h-8"
                   />
@@ -276,6 +336,7 @@ export function ElementPropertiesAccordion({
                     onChange={(e) => onUpdate({
                       backgroundColor: e.target.value
                     })}
+                    disabled={element.locked}
                     className="w-12 h-8 p-1"
                   />
                   <Input
@@ -283,6 +344,7 @@ export function ElementPropertiesAccordion({
                     onChange={(e) => onUpdate({
                       backgroundColor: e.target.value
                     })}
+                    disabled={element.locked}
                     placeholder="#f0f0f0"
                     className="flex-1 h-8"
                   />
@@ -300,6 +362,7 @@ export function ElementPropertiesAccordion({
                       onChange={(e) => onUpdate({
                         borderColor: e.target.value
                       })}
+                      disabled={element.locked}
                       className="w-8 h-8 p-1"
                     />
                     <Input
@@ -307,6 +370,7 @@ export function ElementPropertiesAccordion({
                       onChange={(e) => onUpdate({
                         borderColor: e.target.value
                       })}
+                      disabled={element.locked}
                       placeholder="#000000"
                       className="flex-1 h-8"
                     />
@@ -322,6 +386,7 @@ export function ElementPropertiesAccordion({
                     onChange={(e) => onUpdate({
                       borderWidth: parseInt(e.target.value) || 0
                     })}
+                    disabled={element.locked}
                     className="mt-1 h-8"
                   />
                 </div>
@@ -340,6 +405,7 @@ export function ElementPropertiesAccordion({
                   imageUrl: e.target.value
                 })}
                 placeholder="https://example.com/image.jpg"
+                disabled={element.locked}
                 className="mt-1 h-8"
               />
             </div>

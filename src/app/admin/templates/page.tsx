@@ -61,11 +61,30 @@ export default function TemplatesPage() {
 
   const fetchTemplates = async () => {
     try {
-      const res = await fetch('/api/templates')
+      const res = await fetch('/api/templates', {
+        method: 'GET',
+        credentials: 'include', // Important for cookies
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+      
+      if (!res.ok) {
+        if (res.status === 401) {
+          console.log('Authentication failed, redirecting to login')
+          router.push('/admin/login')
+          return
+        }
+        throw new Error(`HTTP error! status: ${res.status}`)
+      }
+      
       const data = await res.json()
       setTemplates(data.templates || [])
     } catch (err) {
-      console.error(err)
+      console.error('Failed to fetch templates:', err)
+      if (err instanceof Error && err.message.includes('401')) {
+        router.push('/admin/login')
+      }
     } finally {
       setLoading(false)
     }
@@ -79,6 +98,7 @@ export default function TemplatesPage() {
     try {
       const res = await fetch('/api/templates', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: templateData.name,
@@ -91,10 +111,16 @@ export default function TemplatesPage() {
         })
       })
 
-      if (res.ok) {
-        await fetchTemplates()
-        setIsEditorOpen(false)
+      if (!res.ok) {
+        if (res.status === 401) {
+          router.push('/admin/login')
+          return
+        }
+        throw new Error(`HTTP error! status: ${res.status}`)
       }
+
+      await fetchTemplates()
+      setIsEditorOpen(false)
     } catch (err) {
       console.error('Error saving template:', err)
     }
@@ -105,12 +131,19 @@ export default function TemplatesPage() {
 
     try {
       const res = await fetch(`/api/templates/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include'
       })
 
-      if (res.ok) {
-        await fetchTemplates()
+      if (!res.ok) {
+        if (res.status === 401) {
+          router.push('/admin/login')
+          return
+        }
+        throw new Error(`HTTP error! status: ${res.status}`)
       }
+
+      await fetchTemplates()
     } catch (err) {
       console.error('Error deleting template:', err)
     }

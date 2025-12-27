@@ -29,6 +29,9 @@ interface TemplateElement {
   borderWidth?: number
   imageUrl?: string
   fieldName?: string
+  title?: string
+  hidden?: boolean
+  locked?: boolean
 }
 
 interface TemplateDesign {
@@ -56,6 +59,24 @@ export function TemplateEditor({ isOpen, onClose, onSave }: TemplateEditorProps)
     elements: []
   })
   const [selectedElement, setSelectedElement] = useState<TemplateElement | null>(null)
+
+  // Function to generate element titles
+  const generateElementTitle = (type: string, elements: TemplateElement[]) => {
+    const existingElements = elements.filter(el => el.type === type)
+    const count = existingElements.length + 1
+    
+    switch (type) {
+      case 'text':
+      case 'dynamic-text':
+        return `Text ${count}`
+      case 'image':
+        return `Image ${count}`
+      case 'rectangle':
+        return `Rectangle ${count}`
+      default:
+        return `Element ${count}`
+    }
+  }
 
   const handleSave = () => {
     if (!templateName.trim()) return
@@ -94,6 +115,64 @@ export function TemplateEditor({ isOpen, onClose, onSave }: TemplateEditorProps)
     onClose()
   }
 
+  const handleAddElement = (type: string) => {
+    const title = generateElementTitle(type, templateDesign.elements)
+    const newElement: TemplateElement = {
+      id: `element-${Date.now()}`,
+      type,
+      x: 50,
+      y: 50,
+      title,
+      content: type === 'text' ? title : 
+              type === 'dynamic-text' ? '{{userName}}' : '',
+      fontSize: 16,
+      color: '#000000',
+      width: type === 'rectangle' ? 100 : undefined,
+      height: type === 'rectangle' ? 100 : undefined,
+      backgroundColor: type === 'rectangle' ? '#f0f0f0' : undefined,
+      borderColor: type === 'rectangle' ? '#000000' : undefined,
+      borderWidth: type === 'rectangle' ? 1 : undefined,
+      hidden: false,
+      locked: false
+    }
+    
+    setTemplateDesign(prev => ({
+      ...prev,
+      elements: [...prev.elements, newElement]
+    }))
+  }
+
+  const handleDeleteElement = (elementId: string) => {
+    if (!confirm('Are you sure you want to delete this element?')) return
+    
+    setTemplateDesign(prev => ({
+      ...prev,
+      elements: prev.elements.filter(el => el.id !== elementId)
+    }))
+    
+    if (selectedElement?.id === elementId) {
+      setSelectedElement(null)
+    }
+  }
+
+  const handleToggleHide = (elementId: string) => {
+    setTemplateDesign(prev => ({
+      ...prev,
+      elements: prev.elements.map(el =>
+        el.id === elementId ? { ...el, hidden: !el.hidden } : el
+      )
+    }))
+  }
+
+  const handleToggleLock = (elementId: string) => {
+    setTemplateDesign(prev => ({
+      ...prev,
+      elements: prev.elements.map(el =>
+        el.id === elementId ? { ...el, locked: !el.locked } : el
+      )
+    }))
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="!w-[99vw] !h-[99vh] !max-w-[99vw] p-0 overflow-hidden">
@@ -102,28 +181,7 @@ export function TemplateEditor({ isOpen, onClose, onSave }: TemplateEditorProps)
           <DialogHeader className="flex flex-col items-center space-y-3 p-4 border-b">
             <DialogTitle className="text-lg font-semibold">New Template</DialogTitle>
             <ElementTools
-              onAddElement={(type) => {
-                const newElement: TemplateElement = {
-                  id: `element-${Date.now()}`,
-                  type,
-                  x: 50,
-                  y: 50,
-                  content: type === 'text' ? 'Sample Text' : 
-                          type === 'dynamic-text' ? '{{userName}}' : '',
-                  fontSize: 16,
-                  color: '#000000',
-                  width: type === 'rectangle' ? 100 : undefined,
-                  height: type === 'rectangle' ? 100 : undefined,
-                  backgroundColor: type === 'rectangle' ? '#f0f0f0' : undefined,
-                  borderColor: type === 'rectangle' ? '#000000' : undefined,
-                  borderWidth: type === 'rectangle' ? 1 : undefined,
-                }
-                
-                setTemplateDesign(prev => ({
-                  ...prev,
-                  elements: [...prev.elements, newElement]
-                }))
-              }}
+              onAddElement={handleAddElement}
             />
           </DialogHeader>
 
@@ -140,10 +198,9 @@ export function TemplateEditor({ isOpen, onClose, onSave }: TemplateEditorProps)
             </div>
 
             {/* Right side - Properties */}
-            <div className="w-80 flex flex-col">
-              {/* Template Properties and Element Properties */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {/* Template Properties Accordion */}
+            <div className="w-80 flex flex-col h-full">
+              {/* Template Properties - Fixed Top */}
+              <div className="flex-shrink-0 border-b bg-white/95 backdrop-blur-sm p-4 shadow-sm">
                 <div className="border rounded-lg">
                   <Accordion type="single" collapsible defaultValue="template-properties" className="w-full">
                     <AccordionItem value="template-properties" className="border-0">
@@ -218,32 +275,46 @@ export function TemplateEditor({ isOpen, onClose, onSave }: TemplateEditorProps)
                     </AccordionItem>
                   </Accordion>
                 </div>
-
-                {/* Individual Element Properties */}
-                {templateDesign.elements.map((element) => (
-                  <ElementPropertiesAccordion
-                    key={element.id}
-                    element={element}
-                    isSelected={selectedElement?.id === element.id}
-                    onSelect={() => setSelectedElement(element)}
-                    onUpdate={(updates) => {
-                      setTemplateDesign(prev => ({
-                        ...prev,
-                        elements: prev.elements.map(el =>
-                          el.id === element.id ? { ...el, ...updates } : el
-                        )
-                      }))
-                    }}
-                  />
-                ))}
               </div>
 
-              {/* Save Button */}
-              <div className="border-t p-4">
+              {/* Individual Element Properties - Scrollable Middle with Fixed Height */}
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 space-y-3 scrollbar-thin">
+                {templateDesign.elements.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="text-sm">
+                      No elements yet. Add elements using the tools above.
+                    </div>
+                  </div>
+                ) : (
+                  templateDesign.elements.map((element) => (
+                    <ElementPropertiesAccordion
+                      key={element.id}
+                      element={element}
+                      isSelected={selectedElement?.id === element.id}
+                      onSelect={() => setSelectedElement(element)}
+                      onUpdate={(updates) => {
+                        setTemplateDesign(prev => ({
+                          ...prev,
+                          elements: prev.elements.map(el =>
+                            el.id === element.id ? { ...el, ...updates } : el
+                          )
+                        }))
+                      }}
+                      onDelete={() => handleDeleteElement(element.id)}
+                      onToggleHide={() => handleToggleHide(element.id)}
+                      onToggleLock={() => handleToggleLock(element.id)}
+                    />
+                  ))
+                )}
+              </div>
+
+              {/* Save Button - Fixed Bottom */}
+              <div className="flex-shrink-0 border-t bg-white/95 backdrop-blur-sm p-4 shadow-lg border-gray-200">
                 <Button 
                   onClick={handleSave} 
                   disabled={!templateName.trim()}
-                  className="w-full"
+                  className="w-full h-11 font-medium shadow-sm hover:shadow-md transition-shadow"
+                  size="default"
                 >
                   Save Template
                 </Button>
