@@ -1,0 +1,259 @@
+'use client'
+
+import { useRef, useState, useCallback } from 'react'
+import { cn } from '@/lib/utils'
+
+interface TemplateElement {
+  id: string
+  type: 'text' | 'dynamic-text' | 'rectangle' | 'image'
+  x: number
+  y: number
+  width?: number
+  height?: number
+  content?: string
+  fontSize?: number
+  fontWeight?: string
+  textAlign?: 'left' | 'center' | 'right'
+  color?: string
+  backgroundColor?: string
+  borderColor?: string
+  borderWidth?: number
+  imageUrl?: string
+  fieldName?: string
+}
+
+interface TemplateDesign {
+  width: number
+  height: number
+  backgroundColor: string
+  backgroundImage: string
+  elements: TemplateElement[]
+}
+
+interface DesignCanvasProps {
+  design: TemplateDesign
+  onDesignChange: (design: TemplateDesign) => void
+  selectedElement: TemplateElement | null
+  onElementSelect: (element: TemplateElement | null) => void
+}
+
+export function DesignCanvas({ 
+  design, 
+  onDesignChange, 
+  selectedElement, 
+  onElementSelect 
+}: DesignCanvasProps) {
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [isResizing, setIsResizing] = useState(false)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [resizeHandle, setResizeHandle] = useState('')
+
+  const updateElement = useCallback((id: string, updates: Partial<TemplateElement>) => {
+    onDesignChange({
+      ...design,
+      elements: design.elements.map(el =>
+        el.id === id ? { ...el, ...updates } : el
+      )
+    })
+  }, [design, onDesignChange])
+
+  const handleMouseDown = useCallback((e: React.MouseEvent, element: TemplateElement) => {
+    e.stopPropagation()
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect) return
+
+    onElementSelect(element)
+    setIsDragging(true)
+    setDragOffset({
+      x: e.clientX - rect.left - element.x,
+      y: e.clientY - rect.top - element.y
+    })
+  }, [onElementSelect])
+
+  const handleResizeMouseDown = useCallback((e: React.MouseEvent, element: TemplateElement, handle: string) => {
+    e.stopPropagation()
+    onElementSelect(element)
+    setIsResizing(true)
+    setResizeHandle(handle)
+  }, [onElementSelect])
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect) return
+
+    if (isDragging && selectedElement) {
+      const newX = Math.max(0, Math.min(e.clientX - rect.left - dragOffset.x, design.width - 50))
+      const newY = Math.max(0, Math.min(e.clientY - rect.top - dragOffset.y, design.height - 50))
+      
+      updateElement(selectedElement.id, {
+        x: newX,
+        y: newY
+      })
+    } else if (isResizing && selectedElement) {
+      const mouseX = e.clientX - rect.left
+      const mouseY = e.clientY - rect.top
+      
+      let updates: Partial<TemplateElement> = {}
+      
+      switch (resizeHandle) {
+        case 'se':
+          updates.width = Math.max(20, mouseX - selectedElement.x)
+          updates.height = Math.max(20, mouseY - selectedElement.y)
+          break
+        case 'e':
+          updates.width = Math.max(20, mouseX - selectedElement.x)
+          break
+        case 's':
+          updates.height = Math.max(20, mouseY - selectedElement.y)
+          break
+      }
+      
+      updateElement(selectedElement.id, updates)
+    }
+  }, [isDragging, isResizing, selectedElement, dragOffset, design.width, design.height, updateElement, resizeHandle])
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false)
+    setIsResizing(false)
+    setResizeHandle('')
+  }, [])
+
+  const handleCanvasClick = useCallback(() => {
+    onElementSelect(null)
+  }, [onElementSelect])
+
+  const renderElement = (element: TemplateElement) => {
+    const isSelected = selectedElement?.id === element.id
+    const isResizable = element.type === 'rectangle' || element.type === 'image'
+
+    const elementStyle: React.CSSProperties = {
+      position: 'absolute',
+      left: element.x,
+      top: element.y,
+      width: element.width,
+      height: element.height,
+      fontSize: element.fontSize,
+      fontWeight: element.fontWeight,
+      textAlign: element.textAlign,
+      color: element.color,
+      backgroundColor: element.backgroundColor,
+      borderColor: element.borderColor,
+      borderWidth: element.borderWidth,
+      borderStyle: element.borderWidth ? 'solid' : 'none',
+      cursor: isDragging ? 'grabbing' : 'grab',
+      userSelect: 'none'
+    }
+
+    const renderContent = () => {
+      switch (element.type) {
+        case 'text':
+        case 'dynamic-text':
+          return (
+            <div 
+              className="w-full h-full flex items-center justify-center"
+              style={{
+                textAlign: element.textAlign,
+                color: element.color,
+                fontSize: element.fontSize,
+                fontWeight: element.fontWeight
+              }}
+            >
+              {element.content}
+            </div>
+          )
+        case 'rectangle':
+          return (
+            <div 
+              className="w-full h-full"
+              style={{
+                backgroundColor: element.backgroundColor,
+                borderColor: element.borderColor,
+                borderWidth: element.borderWidth,
+                borderStyle: element.borderWidth ? 'solid' : 'none'
+              }}
+            />
+          )
+        case 'image':
+          return (
+            <img 
+              src={element.imageUrl || '/placeholder-image.png'} 
+              alt="Template element"
+              className="w-full h-full object-cover"
+              draggable={false}
+            />
+          )
+        default:
+          return null
+      }
+    }
+
+    return (
+      <div
+        key={element.id}
+        style={elementStyle}
+        className={cn(
+          'transition-shadow',
+          isSelected && 'ring-2 ring-blue-500 ring-offset-1'
+        )}
+        onMouseDown={(e) => handleMouseDown(e, element)}
+      >
+        {renderContent()}
+        
+        {/* Resize handles for selected element */}
+        {isSelected && isResizable && (
+          <>
+            <div
+              className="absolute w-3 h-3 bg-blue-500 rounded-full -bottom-1 -right-1 cursor-se-resize"
+              onMouseDown={(e) => handleResizeMouseDown(e, element, 'se')}
+            />
+            <div
+              className="absolute w-3 h-3 bg-blue-500 rounded-full -right-1 top-1/2 -translate-y-1/2 cursor-e-resize"
+              onMouseDown={(e) => handleResizeMouseDown(e, element, 'e')}
+            />
+            <div
+              className="absolute w-3 h-3 bg-blue-500 rounded-full -bottom-1 left-1/2 -translate-x-1/2 cursor-s-resize"
+              onMouseDown={(e) => handleResizeMouseDown(e, element, 's')}
+            />
+          </>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-full h-full p-6 overflow-auto bg-gray-100">
+      <div
+        ref={canvasRef}
+        className="relative mx-auto bg-white shadow-lg"
+        style={{
+          width: design.width,
+          height: design.height,
+          backgroundColor: design.backgroundColor,
+          backgroundImage: design.backgroundImage ? `url(${design.backgroundImage})` : 'none',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onClick={handleCanvasClick}
+      >
+        {/* Grid background */}
+        <div 
+          className="absolute inset-0 pointer-events-none opacity-10"
+          style={{
+            backgroundImage: `
+              repeating-linear-gradient(0deg, #000 0px, transparent 1px, transparent 20px, #000 21px),
+              repeating-linear-gradient(90deg, #000 0px, transparent 1px, transparent 20px, #000 21px)
+            `
+          }}
+        />
+        
+        {/* Render elements */}
+        {design.elements.map(renderElement)}
+      </div>
+    </div>
+  )
+}
