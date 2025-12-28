@@ -5,9 +5,10 @@ import { db } from '@/lib/db'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     
     if (!session?.user || session.user.role !== 'admin') {
@@ -28,7 +29,7 @@ export async function PUT(
     }
 
     const template = await db.certificateTemplate.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name,
         description: description || '',
@@ -36,11 +37,17 @@ export async function PUT(
         height: height || 794,
         backgroundColor: backgroundColor || '#ffffff',
         backgroundImage: backgroundImage || '',
-        elements
+        elements: JSON.stringify(elements)
       }
     })
 
-    return NextResponse.json(template)
+    // Parse elements back to objects for the response
+    const responseTemplate = {
+      ...template,
+      elements: template.elements ? JSON.parse(template.elements) : []
+    }
+
+    return NextResponse.json(responseTemplate)
   } catch (error) {
     console.error('Template update error:', error)
     return NextResponse.json(
@@ -52,9 +59,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getServerSession(authOptions)
     
     if (!session?.user || session.user.role !== 'admin') {
@@ -65,7 +73,7 @@ export async function DELETE(
     }
 
     const template = await db.certificateTemplate.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (template?.isDefault) {
@@ -76,7 +84,7 @@ export async function DELETE(
     }
 
     await db.certificateTemplate.delete({
-      where: { id: params.id }
+      where: { id }
     })
 
     return NextResponse.json({ message: 'Template deleted successfully' })

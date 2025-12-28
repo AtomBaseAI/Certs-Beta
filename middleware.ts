@@ -23,7 +23,6 @@ export default withAuth(
 export const config = {
   matcher: [
     '/admin/:path*',
-    '/api/templates/:path*',
     '/api/certificates/:path*',
     '/api/organizations/:path*'
   ]

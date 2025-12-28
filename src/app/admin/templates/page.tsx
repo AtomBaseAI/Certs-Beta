@@ -16,9 +16,11 @@ import {
   ArrowLeft,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  Download
 } from 'lucide-react'
 import { TemplateEditor } from '@/components/admin/TemplateEditor'
+import { TemplatePreview } from '@/components/admin/TemplatePreview'
 
 /* ================= TYPES ================= */
 
@@ -44,6 +46,8 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<CertificateTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<CertificateTemplate | null>(null)
+  const [previewTemplate, setPreviewTemplate] = useState<CertificateTemplate | null>(null)
 
   /* ================= AUTH ================= */
 
@@ -72,6 +76,8 @@ export default function TemplatesPage() {
       if (!res.ok) {
         if (res.status === 401) {
           console.log('Authentication failed, redirecting to login')
+          // Clear any potentially corrupted session data
+          await fetch('/api/auth/signout', { method: 'POST' })
           router.push('/admin/login')
           return
         }
@@ -82,7 +88,9 @@ export default function TemplatesPage() {
       setTemplates(data.templates || [])
     } catch (err) {
       console.error('Failed to fetch templates:', err)
+      // Don't automatically redirect on network errors, only on 401
       if (err instanceof Error && err.message.includes('401')) {
+        await fetch('/api/auth/signout', { method: 'POST' })
         router.push('/admin/login')
       }
     } finally {
@@ -96,8 +104,12 @@ export default function TemplatesPage() {
     design: any 
   }) => {
     try {
-      const res = await fetch('/api/templates', {
-        method: 'POST',
+      const isEditing = editingTemplate !== null
+      const url = isEditing ? `/api/templates/${editingTemplate.id}` : '/api/templates'
+      const method = isEditing ? 'PUT' : 'POST'
+      
+      const res = await fetch(url, {
+        method,
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -121,6 +133,7 @@ export default function TemplatesPage() {
 
       await fetchTemplates()
       setIsEditorOpen(false)
+      setEditingTemplate(null)
     } catch (err) {
       console.error('Error saving template:', err)
     }
@@ -146,6 +159,52 @@ export default function TemplatesPage() {
       await fetchTemplates()
     } catch (err) {
       console.error('Error deleting template:', err)
+    }
+  }
+
+  const handleEditTemplate = (template: CertificateTemplate) => {
+    setEditingTemplate(template)
+    setIsEditorOpen(true)
+  }
+
+  const handleCloseEditor = () => {
+    setIsEditorOpen(false)
+    setEditingTemplate(null)
+  }
+
+  const handlePreviewTemplate = (template: CertificateTemplate) => {
+    setPreviewTemplate(template)
+  }
+
+  const handleClosePreview = () => {
+    setPreviewTemplate(null)
+  }
+
+  const handleDownloadTemplate = async (template: CertificateTemplate) => {
+    try {
+      const res = await fetch(`/api/templates/${template.id}/download`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`)
+      }
+
+      // Get the blob and create download link
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${template.name.replace(/\s+/g, '_')}_certificate.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (err) {
+      console.error('Error downloading template:', err)
+      alert('Failed to download template. Please try again.')
     }
   }
 
@@ -200,6 +259,7 @@ export default function TemplatesPage() {
                     size="sm" 
                     variant="outline"
                     className="flex-1"
+                    onClick={() => handlePreviewTemplate(template)}
                   >
                     <Eye className="w-4 h-4 mr-1" /> Preview
                   </Button>
@@ -207,8 +267,17 @@ export default function TemplatesPage() {
                     size="sm" 
                     variant="outline"
                     className="flex-1"
+                    onClick={() => handleEditTemplate(template)}
                   >
                     <Edit className="w-4 h-4 mr-1" /> Edit
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => handleDownloadTemplate(template)}
+                    className="flex-1"
+                  >
+                    <Download className="w-4 h-4 mr-1" /> Download
                   </Button>
                   {!template.isDefault && (
                     <Button 
@@ -247,8 +316,17 @@ export default function TemplatesPage() {
       {/* Template Editor Modal */}
       <TemplateEditor
         isOpen={isEditorOpen}
-        onClose={() => setIsEditorOpen(false)}
+        onClose={handleCloseEditor}
         onSave={handleSaveTemplate}
+        editingTemplate={editingTemplate}
+      />
+
+      {/* Template Preview Modal */}
+      <TemplatePreview
+        isOpen={!!previewTemplate}
+        onClose={handleClosePreview}
+        template={previewTemplate}
+        onDownload={handleDownloadTemplate}
       />
     </div>
   )

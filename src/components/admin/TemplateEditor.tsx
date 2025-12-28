@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogTitle, DialogHeader } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,6 +34,19 @@ interface TemplateElement {
   locked?: boolean
 }
 
+interface CertificateTemplate {
+  id: string
+  name: string
+  description?: string
+  width?: number
+  height?: number
+  backgroundColor?: string
+  backgroundImage?: string
+  elements?: TemplateElement[]
+  isDefault: boolean
+  createdAt: string
+}
+
 interface TemplateDesign {
   width: number
   height: number
@@ -46,9 +59,10 @@ interface TemplateEditorProps {
   isOpen: boolean
   onClose: () => void
   onSave: (template: { name: string; description: string; design: TemplateDesign }) => void
+  editingTemplate?: CertificateTemplate | null
 }
 
-export function TemplateEditor({ isOpen, onClose, onSave }: TemplateEditorProps) {
+export function TemplateEditor({ isOpen, onClose, onSave, editingTemplate }: TemplateEditorProps) {
   const [templateName, setTemplateName] = useState('')
   const [templateDescription, setTemplateDescription] = useState('')
   const [templateDesign, setTemplateDesign] = useState<TemplateDesign>({
@@ -59,6 +73,33 @@ export function TemplateEditor({ isOpen, onClose, onSave }: TemplateEditorProps)
     elements: []
   })
   const [selectedElement, setSelectedElement] = useState<TemplateElement | null>(null)
+
+  // Populate form when editing template changes
+  useEffect(() => {
+    if (editingTemplate) {
+      setTemplateName(editingTemplate.name || '')
+      setTemplateDescription(editingTemplate.description || '')
+      setTemplateDesign({
+        width: editingTemplate.width || 1123,
+        height: editingTemplate.height || 794,
+        backgroundColor: editingTemplate.backgroundColor || '#ffffff',
+        backgroundImage: editingTemplate.backgroundImage || '',
+        elements: editingTemplate.elements || []
+      })
+    } else {
+      // Reset form for new template
+      setTemplateName('')
+      setTemplateDescription('')
+      setTemplateDesign({
+        width: 1123,
+        height: 794,
+        backgroundColor: '#ffffff',
+        backgroundImage: '',
+        elements: []
+      })
+    }
+    setSelectedElement(null)
+  }, [editingTemplate, isOpen])
 
   // Function to generate element titles
   const generateElementTitle = (type: string, elements: TemplateElement[]) => {
@@ -177,12 +218,16 @@ export function TemplateEditor({ isOpen, onClose, onSave }: TemplateEditorProps)
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="!w-[99vw] !h-[99vh] !max-w-[99vw] p-0 overflow-hidden">
         <div className="flex flex-col h-full">
-          {/* Header with title and tools */}
-          <DialogHeader className="flex flex-col items-center space-y-3 p-4 border-b">
-            <DialogTitle className="text-lg font-semibold">New Template</DialogTitle>
-            <ElementTools
-              onAddElement={handleAddElement}
-            />
+          {/* Header with title and tools in same row */}
+          <DialogHeader className="flex flex-row items-center justify-between p-4 border-b">
+            <DialogTitle className="text-lg font-semibold">
+            {editingTemplate ? 'Edit Template' : 'New Template'}
+          </DialogTitle>
+            <div className="flex-1 flex justify-center">
+              <ElementTools
+                onAddElement={handleAddElement}
+              />
+            </div>
           </DialogHeader>
 
           {/* Main content */}

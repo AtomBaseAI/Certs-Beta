@@ -25,7 +25,23 @@ export async function GET() {
       orderBy: { createdAt: 'desc' }
     })
 
-    return NextResponse.json({ templates })
+    // Parse elements JSON string back to objects
+    const parsedTemplates = templates.map(template => {
+      try {
+        return {
+          ...template,
+          elements: template.elements ? JSON.parse(template.elements) : []
+        }
+      } catch (error) {
+        console.error('Error parsing elements for template:', template.id, error)
+        return {
+          ...template,
+          elements: []
+        }
+      }
+    })
+
+    return NextResponse.json({ templates: parsedTemplates })
   } catch (error) {
     console.error('Templates fetch error:', error)
     return NextResponse.json(
@@ -64,7 +80,7 @@ export async function POST(request: NextRequest) {
         height: height || 794,
         backgroundColor: backgroundColor || '#ffffff',
         backgroundImage: backgroundImage || '',
-        elements,
+        elements: JSON.stringify(elements),
         createdBy: session.user.id
       }
     })

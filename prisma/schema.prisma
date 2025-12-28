@@ -63,7 +63,7 @@ model CertificateTemplate {
   height       Int      @default(1123)   // Canvas height in pixels
   backgroundColor String   @default("#ffffff") // Background color
   backgroundImage String?  // Background image URL
-  elements    Json     // Template elements as JSON array
+  elements    String   // Template elements as JSON string
   isDefault   Boolean  @default(false)
   createdBy   String
   createdAt   DateTime @default(now())
