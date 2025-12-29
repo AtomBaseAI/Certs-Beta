@@ -3,6 +3,7 @@
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import React from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,9 +19,14 @@ import {
   Trash2, 
   Users,
   ArrowLeft,
-  Search
+  Search,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  Loader2
 } from 'lucide-react'
 import HexagonLoader from '@/components/ui/hexagon-loader'
+import { formatDate } from '@/lib/utils'
 
 interface Organization {
   id: string
@@ -34,16 +40,42 @@ interface Organization {
   }
 }
 
+interface Program {
+  id: string
+  name: string
+  description: string
+  organizationId: string
+  createdAt: string
+  _count: {
+    certificates: number
+    userData: number
+  }
+}
+
 export default function OrganizationsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [programs, setPrograms] = useState<Program[]>([])
   const [filteredOrgs, setFilteredOrgs] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
+  const [programsLoading, setProgramsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [isProgramDialogOpen, setIsProgramDialogOpen] = useState(false)
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null)
+  const [editingProgram, setEditingProgram] = useState<Program | null>(null)
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('')
+  const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set())
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  const [isProgramSubmitting, setIsProgramSubmitting] = useState(false)
+  const [isProgramDeleting, setIsProgramDeleting] = useState<string | null>(null)
   const [formData, setFormData] = useState({
+    name: '',
+    description: ''
+  })
+  const [programFormData, setProgramFormData] = useState({
     name: '',
     description: ''
   })
@@ -80,8 +112,48 @@ export default function OrganizationsPage() {
     }
   }
 
+  const fetchPrograms = async (organizationId?: string) => {
+    try {
+      setProgramsLoading(true)
+      const url = organizationId 
+        ? `/api/organizations/${organizationId}/programs`
+        : '/api/programs'
+      const response = await fetch(url)
+      const data = await response.json()
+      if (organizationId) {
+        // Update programs for specific organization
+        setPrograms(prev => {
+          const filtered = prev.filter(p => p.organizationId !== organizationId)
+          return [...filtered, ...(data.programs || [])]
+        })
+      } else {
+        setPrograms(data.programs || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch programs:', error)
+    } finally {
+      setProgramsLoading(false)
+    }
+  }
+
+  const toggleOrganizationExpansion = async (orgId: string) => {
+    const newExpanded = new Set(expandedOrgs)
+    if (newExpanded.has(orgId)) {
+      newExpanded.delete(orgId)
+    } else {
+      newExpanded.add(orgId)
+      // Fetch programs for this organization if not already loaded
+      const orgPrograms = programs.filter(p => p.organizationId === orgId)
+      if (orgPrograms.length === 0) {
+        await fetchPrograms(orgId)
+      }
+    }
+    setExpandedOrgs(newExpanded)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
     
     try {
       const url = editingOrg ? `/api/organizations/${editingOrg.id}` : '/api/organizations'
@@ -101,6 +173,8 @@ export default function OrganizationsPage() {
       }
     } catch (error) {
       console.error('Failed to save organization:', error)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -113,6 +187,8 @@ export default function OrganizationsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this organization?')) return
     
+    setIsDeleting(id)
+    
     try {
       const response = await fetch(`/api/organizations/${id}`, {
         method: 'DELETE'
@@ -123,7 +199,79 @@ export default function OrganizationsPage() {
       }
     } catch (error) {
       console.error('Failed to delete organization:', error)
+    } finally {
+      setIsDeleting(null)
     }
+  }
+
+  const handleProgramSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsProgramSubmitting(true)
+    
+    try {
+      const url = editingProgram ? `/api/programs/${editingProgram.id}` : '/api/programs'
+      const method = editingProgram ? 'PUT' : 'POST'
+      
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...programFormData,
+          organizationId: selectedOrgId
+        })
+      })
+
+      if (response.ok) {
+        await fetchPrograms(selectedOrgId)
+        await fetchOrganizations() // Update counts
+        setIsProgramDialogOpen(false)
+        setEditingProgram(null)
+        setSelectedOrgId('')
+        setProgramFormData({ name: '', description: '' })
+      }
+    } catch (error) {
+      console.error('Failed to save program:', error)
+    } finally {
+      setIsProgramSubmitting(false)
+    }
+  }
+
+  const handleEditProgram = (program: Program, orgId: string) => {
+    setEditingProgram(program)
+    setSelectedOrgId(orgId)
+    setProgramFormData({ name: program.name, description: program.description })
+    setIsProgramDialogOpen(true)
+  }
+
+  const handleDeleteProgram = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this program?')) return
+    
+    setIsProgramDeleting(id)
+    
+    try {
+      const response = await fetch(`/api/programs/${id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        await fetchPrograms()
+        await fetchOrganizations() // Update counts
+      } else {
+        const error = await response.json()
+        alert(error.message || 'Failed to delete program')
+      }
+    } catch (error) {
+      console.error('Failed to delete program:', error)
+    } finally {
+      setIsProgramDeleting(null)
+    }
+  }
+
+  const handleAddProgram = (orgId: string) => {
+    setSelectedOrgId(orgId)
+    setEditingProgram(null)
+    setProgramFormData({ name: '', description: '' })
+    setIsProgramDialogOpen(true)
   }
 
   if (status === 'loading' || loading) {
@@ -210,8 +358,17 @@ export default function OrganizationsPage() {
                   <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit">
-                    {editingOrg ? 'Update' : 'Create'}
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        {editingOrg ? 'Updating...' : 'Creating...'}
+                      </>
+                    ) : (
+                      <>
+                        {editingOrg ? 'Update' : 'Create'}
+                      </>
+                    )}
                   </Button>
                 </div>
               </form>
@@ -258,49 +415,220 @@ export default function OrganizationsPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredOrgs.map((org) => (
-                    <TableRow key={org.id}>
-                      <TableCell className="font-medium">{org.name}</TableCell>
-                      <TableCell className="max-w-xs truncate">{org.description}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          <Users className="h-3 w-3 mr-1" />
-                          {org._count.programs}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {org._count.certificates}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(org.createdAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(org)}
+                    <React.Fragment key={org.id}>
+                      <TableRow>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleOrganizationExpansion(org.id)}
+                              className="p-1 h-6 w-6"
+                            >
+                              {expandedOrgs.has(org.id) ? (
+                                <ChevronUp className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                            </Button>
+                            {org.name}
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate">{org.description}</TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant="secondary" 
+                            className="cursor-pointer hover:bg-gray-200"
+                            onClick={() => toggleOrganizationExpansion(org.id)}
                           >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(org.id)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                            <Users className="h-3 w-3 mr-1" />
+                            {org._count.programs}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {org._count.certificates}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {formatDate(org.createdAt)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleAddProgram(org.id)}
+                              title="Add Program"
+                            >
+                              <BookOpen className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(org)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(org.id)}
+                              className="text-red-600 hover:text-red-700"
+                              disabled={isDeleting === org.id}
+                            >
+                              {isDeleting === org.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      
+                      {/* Programs Row */}
+                      {expandedOrgs.has(org.id) && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="p-0 bg-gray-50">
+                            <div className="p-4">
+                              <div className="flex justify-between items-center mb-3">
+                                <h4 className="font-medium text-sm text-gray-700">
+                                  Programs ({org._count.programs})
+                                </h4>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleAddProgram(org.id)}
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Add Program
+                                </Button>
+                              </div>
+                              
+                              {programsLoading ? (
+                                <div className="text-center py-4">
+                                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                                </div>
+                              ) : programs.filter(p => p.organizationId === org.id).length === 0 ? (
+                                <div className="text-center py-4 text-gray-500">
+                                  <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                  <p className="text-sm">No programs yet. Add your first program to get started.</p>
+                                </div>
+                              ) : (
+                                <div className="grid gap-2">
+                                  {programs
+                                    .filter(p => p.organizationId === org.id)
+                                    .map((program) => (
+                                      <div
+                                        key={program.id}
+                                        className="flex items-center justify-between p-3 bg-white rounded border border-gray-200"
+                                      >
+                                        <div className="flex-1">
+                                          <h5 className="font-medium text-sm">{program.name}</h5>
+                                          {program.description && (
+                                            <p className="text-xs text-gray-500 mt-1">{program.description}</p>
+                                          )}
+                                          <div className="flex items-center space-x-4 mt-2">
+                                            <Badge variant="outline" className="text-xs">
+                                              {program._count.certificates} certificates
+                                            </Badge>
+                                            <Badge variant="secondary" className="text-xs">
+                                              {program._count.userData} users
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                        <div className="flex space-x-1">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleEditProgram(program, org.id)}
+                                            className="h-8 w-8 p-0"
+                                          >
+                                            <Edit className="h-3 w-3" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleDeleteProgram(program.id)}
+                                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                            disabled={isProgramDeleting === program.id}
+                                          >
+                                            {isProgramDeleting === program.id ? (
+                                              <Loader2 className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <Trash2 className="h-3 w-3" />
+                                            )}
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
                   ))}
                 </TableBody>
               </Table>
             )}
           </CardContent>
         </Card>
+
+        {/* Program Dialog */}
+        <Dialog open={isProgramDialogOpen} onOpenChange={setIsProgramDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {editingProgram ? 'Edit Program' : 'Create New Program'}
+              </DialogTitle>
+              <DialogDescription>
+                {editingProgram 
+                  ? 'Update program details' 
+                  : `Add a new program to ${organizations.find(org => org.id === selectedOrgId)?.name || 'the organization'}`
+                }
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleProgramSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="program-name">Program Name</Label>
+                <Input
+                  id="program-name"
+                  value={programFormData.name}
+                  onChange={(e) => setProgramFormData({ ...programFormData, name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="program-description">Description</Label>
+                <Textarea
+                  id="program-description"
+                  value={programFormData.description}
+                  onChange={(e) => setProgramFormData({ ...programFormData, description: e.target.value })}
+                  rows={3}
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button type="button" variant="outline" onClick={() => setIsProgramDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isProgramSubmitting}>
+                  {isProgramSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {editingProgram ? 'Updating...' : 'Creating...'}
+                    </>
+                  ) : (
+                    <>
+                      {editingProgram ? 'Update' : 'Create'}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   )

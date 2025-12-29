@@ -3,6 +3,48 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user || session.user.role !== 'admin') {
+      return NextResponse.json(
+        { message: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    const template = await db.certificateTemplate.findUnique({
+      where: { id }
+    })
+
+    if (!template) {
+      return NextResponse.json(
+        { message: 'Template not found' },
+        { status: 404 }
+      )
+    }
+
+    // Parse elements back to objects for response
+    const responseTemplate = {
+      ...template,
+      elements: template.elements ? JSON.parse(template.elements) : []
+    }
+
+    return NextResponse.json({ template: responseTemplate })
+  } catch (error) {
+    console.error('Template fetch error:', error)
+    return NextResponse.json(
+      { message: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

@@ -23,15 +23,17 @@ import {
   Download,
   Upload,
   Users,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react'
 import HexagonLoader from '@/components/ui/hexagon-loader'
+import { formatDate } from '@/lib/utils'
 
 interface Certificate {
   id: string
   certificateId: string
-  studentName: string
-  studentEmail?: string
+  userName: string
+  userEmail?: string
   issueDate: string
   completionDate?: string
   verificationCode: string
@@ -60,6 +62,12 @@ interface Organization {
 interface Template {
   id: string
   name: string
+  elements?: {
+    id: string
+    type: 'text' | 'dynamic-text' | 'rectangle' | 'image'
+    fieldName?: string
+    title?: string
+  }[]
 }
 
 export default function CertificatesPage() {
@@ -68,6 +76,7 @@ export default function CertificatesPage() {
   const [certificates, setCertificates] = useState<Certificate[]>([])
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
+  const [selectedTemplateDetails, setSelectedTemplateDetails] = useState<Template | null>(null)
   const [filteredCerts, setFilteredCerts] = useState<Certificate[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -77,11 +86,14 @@ export default function CertificatesPage() {
   const [selectedProgram, setSelectedProgram] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState('')
   const [csvFile, setCsvFile] = useState<File | null>(null)
-  const [formData, setFormData] = useState({
-    studentName: '',
-    studentEmail: '',
-    completionDate: ''
-  })
+  const [formData, setFormData] = useState<Record<string, string>>({})
+  const [dynamicFields, setDynamicFields] = useState<string[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  const [isDownloading, setIsDownloading] = useState<string | null>(null)
+  const [isBulkDownloading, setIsBulkDownloading] = useState(false)
+  const [isBulkUploading, setIsBulkUploading] = useState(false)
+  const [isRevoking, setIsRevoking] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -97,8 +109,8 @@ export default function CertificatesPage() {
 
   useEffect(() => {
     const filtered = certificates.filter(cert =>
-      cert.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cert.studentEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cert.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cert.userEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       cert.certificateId.toLowerCase().includes(searchTerm.toLowerCase()) ||
       cert.organization.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       cert.program.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -130,34 +142,164 @@ export default function CertificatesPage() {
     }
   }
 
+  const fetchTemplateDetails = async (templateId: string) => {
+    try {
+      const response = await fetch(`/api/templates/${templateId}`)
+      
+      if (!response.ok) {
+        console.error('Template fetch failed:', response.status)
+        return
+      }
+      
+      const data = await response.json()
+      
+      if (!data.template) {
+        console.error('No template data in response')
+        return
+      }
+      
+      setSelectedTemplateDetails(data.template)
+      
+      // Extract dynamic fields from template elements
+      const elements = data.template.elements || []
+      
+      // Look for both dynamic-text elements with fieldName and text elements with {{fieldName}} content
+      const dynamicTextElements = elements.filter(
+        (el: any) => {
+          // Check for dynamic-text elements with fieldName
+          if (el.type === 'dynamic-text' && el.fieldName) {
+            return true
+          }
+          
+          // Check for text elements with {{fieldName}} content
+          if (el.type === 'text' && el.content && typeof el.content === 'string') {
+            const match = el.content.match(/\{\{(\w+)\}\}/)
+            if (match && match[1]) {
+              // Store the field name for later use
+              el.fieldName = match[1]
+              return true
+            }
+          }
+          
+          return false
+        }
+      )
+      
+      const fields = dynamicTextElements.map((el: any) => el.fieldName)
+      
+      setDynamicFields(fields)
+      
+      // Initialize form data with empty values for new fields
+      const newFormData: Record<string, string> = {}
+      fields.forEach(field => {
+        if (field === 'certificateId') {
+          newFormData[field] = generateUUID() // Auto-generate UUID for certificate ID
+        } else {
+          newFormData[field] = ''
+        }
+      })
+      setFormData(newFormData)
+      
+    } catch (error) {
+      console.error('Failed to fetch template details:', error)
+    }
+  }
+
   const handleCreateCertificate = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
+    
+    const requestData = {
+      ...formData,
+      organizationId: selectedOrg,
+      programId: selectedProgram,
+      templateId: selectedTemplate
+    }
     
     try {
       const response = await fetch('/api/certificates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentName: formData.studentName,
-          studentEmail: formData.studentEmail,
-          completionDate: formData.completionDate,
-          organizationId: selectedOrg,
-          programId: selectedProgram,
-          templateId: selectedTemplate
-        })
+        body: JSON.stringify(requestData)
       })
 
       if (response.ok) {
         await fetchData()
         setIsCreateDialogOpen(false)
-        setFormData({ studentName: '', studentEmail: '', completionDate: '' })
-        setSelectedOrg('')
-        setSelectedProgram('')
-        setSelectedTemplate('')
+        resetForm()
+      } else {
+        const errorData = await response.json()
+        alert(`Error: ${errorData.message || 'Failed to create certificate'}`)
       }
     } catch (error) {
       console.error('Failed to create certificate:', error)
+      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setIsSubmitting(false)
     }
+  }
+
+  const resetForm = () => {
+    setFormData({ certificateId: generateUUID() }) // Always initialize with certificate ID
+    setDynamicFields([])
+    setSelectedTemplateDetails(null)
+    setSelectedOrg('')
+    setSelectedProgram('')
+    setSelectedTemplate('')
+  }
+
+  const handleTemplateChange = (templateId: string) => {
+    setSelectedTemplate(templateId)
+    if (templateId) {
+      fetchTemplateDetails(templateId)
+    } else {
+      // Reset template-specific fields
+      setSelectedTemplateDetails(null)
+      setDynamicFields([])
+      setFormData({ certificateId: generateUUID() }) // Keep certificate ID
+    }
+  }
+
+  // Helper functions for dynamic field handling
+  const getFieldLabel = (fieldName: string): string => {
+    const labels: Record<string, string> = {
+      userName: 'User Name',
+      userEmail: 'User Email',
+      completionDate: 'Completion Date',
+      programName: 'Program Name',
+      organizationName: 'Organization Name',
+      certificateId: 'Certificate ID',
+      issueDate: 'Issue Date',
+      date: 'Date',
+      instructorName: 'Instructor Name',
+      courseName: 'Course Name',
+      grade: 'Grade',
+      score: 'Score'
+    }
+    return labels[fieldName] || fieldName.charAt(0).toUpperCase() + fieldName.slice(1)
+  }
+
+  const getFieldType = (fieldName: string): string => {
+    const types: Record<string, string> = {
+      userEmail: 'email',
+      completionDate: 'date',
+      issueDate: 'date',
+      date: 'date'
+    }
+    return types[fieldName] || 'text'
+  }
+
+  const isRequiredField = (fieldName: string): boolean => {
+    const requiredFields = ['userName', 'userEmail']
+    return requiredFields.includes(fieldName)
+  }
+
+  const generateUUID = (): string => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0
+      const v = c === 'x' ? r : (r & 0x3 | 0x8)
+      return v.toString(16)
+    })
   }
 
   const handleBulkUpload = async () => {
@@ -165,6 +307,8 @@ export default function CertificatesPage() {
       alert('Please fill all fields and select a CSV file')
       return
     }
+
+    setIsBulkUploading(true)
 
     const formData = new FormData()
     formData.append('file', csvFile)
@@ -182,16 +326,17 @@ export default function CertificatesPage() {
         await fetchData()
         setIsBulkDialogOpen(false)
         setCsvFile(null)
-        setSelectedOrg('')
-        setSelectedProgram('')
-        setSelectedTemplate('')
+        resetForm()
       }
     } catch (error) {
       console.error('Failed to upload certificates:', error)
+    } finally {
+      setIsBulkUploading(false)
     }
   }
 
   const handleDownload = async (id: string) => {
+    setIsDownloading(id)
     try {
       const response = await fetch(`/api/certificates/${id}/download`)
       if (response.ok) {
@@ -207,10 +352,13 @@ export default function CertificatesPage() {
       }
     } catch (error) {
       console.error('Failed to download certificate:', error)
+    } finally {
+      setIsDownloading(null)
     }
   }
 
   const handleBulkDownload = async () => {
+    setIsBulkDownloading(true)
     try {
       const response = await fetch('/api/certificates/bulk-download')
       if (response.ok) {
@@ -226,11 +374,15 @@ export default function CertificatesPage() {
       }
     } catch (error) {
       console.error('Failed to download certificates:', error)
+    } finally {
+      setIsBulkDownloading(false)
     }
   }
 
   const handleRevoke = async (id: string) => {
     if (!confirm('Are you sure you want to revoke this certificate?')) return
+    
+    setIsRevoking(id)
     
     try {
       const response = await fetch(`/api/certificates/${id}/revoke`, {
@@ -242,6 +394,8 @@ export default function CertificatesPage() {
       }
     } catch (error) {
       console.error('Failed to revoke certificate:', error)
+    } finally {
+      setIsRevoking(null)
     }
   }
 
@@ -273,9 +427,18 @@ export default function CertificatesPage() {
             <h1 className="text-2xl font-bold text-gray-900">Certificates</h1>
           </div>
           <div className="flex space-x-2">
-            <Button variant="outline" onClick={handleBulkDownload}>
-              <Download className="h-4 w-4 mr-2" />
-              Bulk Download
+            <Button variant="outline" onClick={handleBulkDownload} disabled={isBulkDownloading}>
+              {isBulkDownloading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Bulk Download
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -304,12 +467,7 @@ export default function CertificatesPage() {
               
               <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button onClick={() => {
-                    setFormData({ studentName: '', studentEmail: '', completionDate: '' })
-                    setSelectedOrg('')
-                    setSelectedProgram('')
-                    setSelectedTemplate('')
-                  }}>
+                  <Button onClick={resetForm}>
                     <Plus className="h-4 w-4 mr-2" />
                     Issue Certificate
                   </Button>
@@ -318,42 +476,12 @@ export default function CertificatesPage() {
                   <DialogHeader>
                     <DialogTitle>Issue New Certificate</DialogTitle>
                     <DialogDescription>
-                      Create and issue a new certificate to a student
+                      Create and issue a new certificate to a user
                     </DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleCreateCertificate} className="space-y-4">
+                    {/* Organization and Program Selection */}
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="studentName">User Name *</Label>
-                        <Input
-                          id="studentName"
-                          value={formData.studentName}
-                          onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="studentEmail">User Email</Label>
-                        <Input
-                          id="studentEmail"
-                          type="email"
-                          value={formData.studentEmail}
-                          onChange={(e) => setFormData({ ...formData, studentEmail: e.target.value })}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="completionDate">Completion Date</Label>
-                      <Input
-                        id="completionDate"
-                        type="date"
-                        value={formData.completionDate}
-                        onChange={(e) => setFormData({ ...formData, completionDate: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>Organization *</Label>
                         <Select value={selectedOrg} onValueChange={setSelectedOrg} required>
@@ -390,30 +518,120 @@ export default function CertificatesPage() {
                           </SelectContent>
                         </Select>
                       </div>
-
-                      <div className="space-y-2">
-                        <Label>Template</Label>
-                        <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select template" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {templates.map((template) => (
-                              <SelectItem key={template.id} value={template.id}>
-                                {template.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
                     </div>
+
+                    {/* Template Selection */}
+                    <div className="space-y-2">
+                      <Label>Template</Label>
+                      <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select template" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {templates.map((template) => (
+                            <SelectItem key={template.id} value={template.id}>
+                              {template.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Dynamic Fields Based on Template */}
+                    {dynamicFields.length > 0 && (
+                      <div className="space-y-4">
+                        <div className="border-t pt-4">
+                          <h4 className="font-medium text-sm mb-3">Certificate Information</h4>
+                          <div className="text-xs text-gray-500 mb-2">
+                            Debug: Found {dynamicFields.length} dynamic fields: {dynamicFields.join(', ')}
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {dynamicFields.map((fieldName) => (
+                              <div key={fieldName} className="space-y-2">
+                                <Label htmlFor={fieldName}>
+                                  {getFieldLabel(fieldName)}
+                                  {isRequiredField(fieldName) && ' *'}
+                                </Label>
+                                <Input
+                                  id={fieldName}
+                                  type={getFieldType(fieldName)}
+                                  value={formData[fieldName] || ''}
+                                  onChange={(e) => setFormData({ ...formData, [fieldName]: e.target.value })}
+                                  required={isRequiredField(fieldName)}
+                                  placeholder={`Enter ${getFieldLabel(fieldName).toLowerCase()}`}
+                                  disabled={fieldName === 'certificateId'}
+                                  className={fieldName === 'certificateId' ? 'bg-gray-100 text-gray-600' : ''}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Default fields when no template selected */}
+                    {dynamicFields.length === 0 && (
+                      <div className="space-y-4">
+                        <div className="border-t pt-4">
+                          <h4 className="font-medium text-sm mb-3">Basic Certificate Information</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="studentName">User Name *</Label>
+                              <Input
+                                id="studentName"
+                                value={formData.studentName || ''}
+                                onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
+                                required
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="studentEmail">User Email</Label>
+                              <Input
+                                id="studentEmail"
+                                type="email"
+                                value={formData.studentEmail || ''}
+                                onChange={(e) => setFormData({ ...formData, studentEmail: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="certificateId">Certificate ID</Label>
+                              <Input
+                                id="certificateId"
+                                value={formData.certificateId || ''}
+                                disabled
+                                className="bg-gray-100 text-gray-600"
+                                placeholder="Auto-generated UUID"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="completionDate">Completion Date</Label>
+                              <Input
+                                id="completionDate"
+                                type="date"
+                                value={formData.completionDate || ''}
+                                onChange={(e) => setFormData({ ...formData, completionDate: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="flex justify-end space-x-2">
                       <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                         Cancel
                       </Button>
-                      <Button type="submit">
-                        Issue Certificate
+                      <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Issuing...
+                          </>
+                        ) : (
+                          <>
+                            Issue Certificate
+                          </>
+                        )}
                       </Button>
                     </div>
                   </form>
@@ -474,7 +692,7 @@ export default function CertificatesPage() {
                           <TableCell>{cert.organization.name}</TableCell>
                           <TableCell>{cert.program.name}</TableCell>
                           <TableCell>
-                            {new Date(cert.issueDate).toLocaleDateString()}
+                            {formatDate(cert.issueDate)}
                           </TableCell>
                           <TableCell>
                             <Badge variant={cert.status === 'issued' ? 'default' : 'secondary'}>
@@ -487,8 +705,13 @@ export default function CertificatesPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleDownload(cert.id)}
+                                disabled={isDownloading === cert.id}
                               >
-                                <Download className="h-4 w-4" />
+                                {isDownloading === cert.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Download className="h-4 w-4" />
+                                )}
                               </Button>
                               {cert.status === 'issued' && (
                                 <Button
@@ -496,8 +719,13 @@ export default function CertificatesPage() {
                                   size="sm"
                                   onClick={() => handleRevoke(cert.id)}
                                   className="text-red-600 hover:text-red-700"
+                                  disabled={isRevoking === cert.id}
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  {isRevoking === cert.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
                                 </Button>
                               )}
                             </div>
@@ -598,11 +826,20 @@ export default function CertificatesPage() {
 
                 <Button 
                   onClick={handleBulkUpload}
-                  disabled={!csvFile || !selectedOrg || !selectedProgram}
+                  disabled={!csvFile || !selectedOrg || !selectedProgram || isBulkUploading}
                   className="w-full"
                 >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Generate Certificates
+                  {isBulkUploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Generate Certificates
+                    </>
+                  )}
                 </Button>
               </CardContent>
             </Card>

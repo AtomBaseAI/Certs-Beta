@@ -41,16 +41,24 @@ export async function POST(
       elements = []
     }
 
-    // Sample data for dynamic fields
+    // Helper function to format date in DD/MM/YYYY format
+    const formatDate = (date: Date): string => {
+      const day = date.getDate().toString().padStart(2, '0')
+      const month = (date.getMonth() + 1).toString().padStart(2, '0')
+      const year = date.getFullYear()
+      return `${day}/${month}/${year}`
+    }
+
+    // Sample data for dynamic fields with realistic values
     const sampleData = {
-      userName: 'John Doe',
-      programName: 'Web Development Fundamentals',
-      organizationName: 'Sample Education Institute',
-      completionDate: new Date().toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      })
+      userName: 'Alex Johnson',
+      userEmail: 'alex.johnson@example.com',
+      programName: 'Advanced Web Development',
+      organizationName: 'Tech Academy International',
+      completionDate: formatDate(new Date()),
+      date: formatDate(new Date()),
+      issueDate: formatDate(new Date()),
+      certificateId: 'TC-2024-001234'
     }
 
     // Create a canvas element to render the certificate
@@ -70,9 +78,13 @@ export async function POST(
         if (!content) return ''
         return content
           .replace(/\{\{userName\}\}/g, sampleData.userName)
+          .replace(/\{\{userEmail\}\}/g, sampleData.userEmail)
           .replace(/\{\{programName\}\}/g, sampleData.programName)
           .replace(/\{\{organizationName\}\}/g, sampleData.organizationName)
           .replace(/\{\{completionDate\}\}/g, sampleData.completionDate)
+          .replace(/\{\{date\}\}/g, sampleData.date)
+          .replace(/\{\{issueDate\}\}/g, sampleData.issueDate)
+          .replace(/\{\{certificateId\}\}/g, sampleData.certificateId)
       }
 
       switch (element.type) {

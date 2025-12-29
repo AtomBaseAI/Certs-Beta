@@ -48,8 +48,8 @@ export async function POST(request: NextRequest) {
 
       return {
         certificateId,
-        userName: record.studentName || record.name || '', // This will map to the userName field
-        userEmail: record.studentEmail || record.email || null,
+        userName: record.userName || record.name || '', // This will map to the userName field
+        userEmail: record.userEmail || record.email || null,
         completionDate: record.completionDate ? new Date(record.completionDate) : null,
         verificationCode,
         organizationId,
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
 
     if (certificates.length === 0) {
       return NextResponse.json(
-        { message: 'No valid student records found in CSV' },
+        { message: 'No valid user records found in CSV' },
         { status: 400 }
       )
     }

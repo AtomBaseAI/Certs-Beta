@@ -40,7 +40,6 @@ export async function GET(request: NextRequest) {
     const transformedCertificate = {
       ...certificate,
       userName: certificate.userName, // This maps to the userName field in the database
-      studentName: certificate.userName, // Keep for backward compatibility
       certificateId: certificate.certificateId // Add certificate ID for display
     }
 

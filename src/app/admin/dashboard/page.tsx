@@ -19,6 +19,7 @@ import {
   Settings
 } from 'lucide-react'
 import HexagonLoader from '@/components/ui/hexagon-loader'
+import { formatDate } from '@/lib/utils'
 
 export default function AdminDashboard() {
   const { data: session, status } = useSession()
@@ -231,7 +232,7 @@ export default function AdminDashboard() {
                             <Award className="h-6 w-6 text-primary" />
                           </div>
                           <div>
-                            <p className="font-medium">{cert.studentName}</p>
+                            <p className="font-medium">{cert.userName}</p>
                             <p className="text-sm text-gray-500">{cert.program?.name}</p>
                           </div>
                         </div>
@@ -240,7 +241,7 @@ export default function AdminDashboard() {
                             {cert.status}
                           </Badge>
                           <p className="text-sm text-gray-500 mt-1">
-                            {new Date(cert.createdAt).toLocaleDateString()}
+                            {formatDate(cert.createdAt)}
                           </p>
                         </div>
                       </div>

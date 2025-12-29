@@ -82,7 +82,7 @@ export default function TemplatesPage() {
       
       if (!res.ok) {
         if (res.status === 401) {
-          console.log('Authentication failed, redirecting to login')
+        // Authentication failed, redirect to login
           // Clear any potentially corrupted session data
           await fetch('/api/auth/signout', { method: 'POST' })
           router.push('/admin/login')

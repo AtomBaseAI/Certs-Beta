@@ -296,7 +296,7 @@ export async function GET(
         // Auto-print dialog when page loads
         window.addEventListener('load', function() {
             setTimeout(function() {
-                console.log('Ready to print! Use Ctrl+P or Cmd+P to save as PDF.');
+                // Certificate is ready for download
             }, 1000);
         });
         

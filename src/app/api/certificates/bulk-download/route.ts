@@ -25,9 +25,9 @@ export async function GET(request: NextRequest) {
     // For now, return a simple CSV file
     // In a real implementation, you would generate actual PDFs and zip them
     const csvContent = [
-      'Certificate ID,Student Name,Student Email,Program,Organization,Issue Date,Verification Code',
+      'Certificate ID,User Name,User Email,Program,Organization,Issue Date,Verification Code',
       ...certificates.map(cert => 
-        `${cert.certificateId},"${cert.studentName}","${cert.studentEmail || ''}","${cert.program.name}","${cert.organization.name}","${cert.issueDate}","${cert.verificationCode}"`
+        `${cert.certificateId},"${cert.userName}","${cert.userEmail || ''}","${cert.program.name}","${cert.organization.name}","${cert.issueDate}","${cert.verificationCode}"`
       )
     ].join('\n')
 
