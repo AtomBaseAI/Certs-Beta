@@ -6,13 +6,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Search, Award, FileCheck, Download, Shield, CheckCircle, X } from 'lucide-react'
+import { toast } from '@/hooks/use-toast'
+import { Search, Award, FileCheck, Download, Shield, CheckCircle, X, Loader2 } from 'lucide-react'
 
 export default function Home() {
   const [verificationCode, setVerificationCode] = useState('')
   const [verificationResult, setVerificationResult] = useState<any>(null)
   const [isVerifying, setIsVerifying] = useState(false)
   const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
 
   const handleVerify = async () => {
     if (!verificationCode.trim()) return
@@ -38,6 +40,44 @@ export default function Home() {
     setVerificationCode('')
     setVerificationResult(null)
     setIsVerifyDialogOpen(false)
+  }
+
+  const handleDownload = async () => {
+    setIsDownloading(true)
+    try {
+      const response = await fetch('/api/download-code')
+      
+      if (!response.ok) {
+        throw new Error('Failed to download source code')
+      }
+      
+      // Create a blob from the response
+      const blob = await response.blob()
+      
+      // Create a temporary URL and trigger download
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'certs-beta-source-code.zip'
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+      toast({
+        title: "Download Successful",
+        description: "Source code downloaded successfully. Check your downloads folder.",
+      })
+    } catch (error) {
+      console.error('Download error:', error)
+      toast({
+        title: "Download Failed",
+        description: "Failed to download source code. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDownloading(false)
+    }
   }
 
   return (
@@ -258,6 +298,25 @@ export default function Home() {
             </Button>
             <Button size="lg" asChild>
               <a href="/admin/login">Get Started</a>
+            </Button>
+            <Button 
+              size="lg" 
+              variant="outline" 
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download Source Code
+                </>
+              )}
             </Button>
           </div>
         </div>

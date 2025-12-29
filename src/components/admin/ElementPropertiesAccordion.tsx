@@ -80,6 +80,16 @@ export function ElementPropertiesAccordion({
     }
   }
 
+  const getElementName = (type: string) => {
+    switch (type) {
+      case 'text': return 'Text'
+      case 'dynamic-text': return 'Dynamic Text'
+      case 'rectangle': return 'Rectangle'
+      case 'image': return 'Image'
+      default: return 'Element'
+    }
+  }
+
   return (
     <Accordion 
       type="single" 
@@ -88,7 +98,7 @@ export function ElementPropertiesAccordion({
     >
       <AccordionItem 
         value={element.id} 
-        className={`border rounded-lg ${isSelected ? 'ring-2 ring-blue-500' : ''} ${element.hidden ? 'opacity-50' : ''}`}
+        className={`border ${isSelected ? 'ring-2 ring-blue-500' : ''} ${element.hidden ? 'opacity-50' : ''}`}
       >
         <AccordionTrigger 
           onClick={onSelect}

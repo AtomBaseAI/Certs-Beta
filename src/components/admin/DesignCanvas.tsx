@@ -231,15 +231,15 @@ export function DesignCanvas({
         {isSelected && isResizable && !element.locked && (
           <>
             <div
-              className="absolute w-3 h-3 bg-blue-500 rounded-full -bottom-1 -right-1 cursor-se-resize"
+              className="absolute w-3 h-3 bg-blue-500 -bottom-1 -right-1 cursor-se-resize"
               onMouseDown={(e) => handleResizeMouseDown(e, element, 'se')}
             />
             <div
-              className="absolute w-3 h-3 bg-blue-500 rounded-full -right-1 top-1/2 -translate-y-1/2 cursor-e-resize"
+              className="absolute w-3 h-3 bg-blue-500 -right-1 top-1/2 -translate-y-1/2 cursor-e-resize"
               onMouseDown={(e) => handleResizeMouseDown(e, element, 'e')}
             />
             <div
-              className="absolute w-3 h-3 bg-blue-500 rounded-full -bottom-1 left-1/2 -translate-x-1/2 cursor-s-resize"
+              className="absolute w-3 h-3 bg-blue-500 -bottom-1 left-1/2 -translate-x-1/2 cursor-s-resize"
               onMouseDown={(e) => handleResizeMouseDown(e, element, 's')}
             />
           </>
@@ -247,8 +247,8 @@ export function DesignCanvas({
         
         {/* Lock indicator */}
         {element.locked && (
-          <div className="absolute top-1 right-1 w-4 h-4 bg-gray-600 rounded-full flex items-center justify-center">
-            <div className="w-2 h-2 bg-white rounded-sm"></div>
+          <div className="absolute top-1 right-1 w-4 h-4 bg-gray-600 flex items-center justify-center">
+            <div className="w-2 h-2 bg-white"></div>
           </div>
         )}
       </div>

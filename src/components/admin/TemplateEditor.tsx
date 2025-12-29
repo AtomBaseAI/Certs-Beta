@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion'
-import { Settings } from 'lucide-react'
+import { Settings, Loader2 } from 'lucide-react'
 import { DesignCanvas } from './DesignCanvas'
 import { ElementPropertiesAccordion } from './ElementPropertiesAccordion'
 import { ElementTools } from './ElementTools'
@@ -60,9 +60,10 @@ interface TemplateEditorProps {
   onClose: () => void
   onSave: (template: { name: string; description: string; design: TemplateDesign }) => void
   editingTemplate?: CertificateTemplate | null
+  saving?: boolean
 }
 
-export function TemplateEditor({ isOpen, onClose, onSave, editingTemplate }: TemplateEditorProps) {
+export function TemplateEditor({ isOpen, onClose, onSave, editingTemplate, saving = false }: TemplateEditorProps) {
   const [templateName, setTemplateName] = useState('')
   const [templateDescription, setTemplateDescription] = useState('')
   const [templateDesign, setTemplateDesign] = useState<TemplateDesign>({
@@ -246,7 +247,7 @@ export function TemplateEditor({ isOpen, onClose, onSave, editingTemplate }: Tem
             <div className="w-80 flex flex-col h-full">
               {/* Template Properties - Fixed Top */}
               <div className="flex-shrink-0 border-b bg-white/95 backdrop-blur-sm p-4 shadow-sm">
-                <div className="border rounded-lg">
+                <div className="border">
                   <Accordion type="single" collapsible defaultValue="template-properties" className="w-full">
                     <AccordionItem value="template-properties" className="border-0">
                       <AccordionTrigger className="px-3 py-2 hover:no-underline">
@@ -357,11 +358,18 @@ export function TemplateEditor({ isOpen, onClose, onSave, editingTemplate }: Tem
               <div className="flex-shrink-0 border-t bg-white/95 backdrop-blur-sm p-4 shadow-lg border-gray-200">
                 <Button 
                   onClick={handleSave} 
-                  disabled={!templateName.trim()}
+                  disabled={!templateName.trim() || saving}
                   className="w-full h-11 font-medium shadow-sm hover:shadow-md transition-shadow"
                   size="default"
                 >
-                  Save Template
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Template'
+                  )}
                 </Button>
               </div>
             </div>

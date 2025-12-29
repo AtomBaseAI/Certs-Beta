@@ -17,10 +17,12 @@ import {
   Eye,
   Edit,
   Trash2,
-  Download
+  Download,
+  Loader2
 } from 'lucide-react'
 import { TemplateEditor } from '@/components/admin/TemplateEditor'
 import { TemplatePreview } from '@/components/admin/TemplatePreview'
+import { useToast } from '@/hooks/use-toast'
 
 /* ================= TYPES ================= */
 
@@ -42,12 +44,16 @@ interface CertificateTemplate {
 export default function TemplatesPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const { toast } = useToast()
 
   const [templates, setTemplates] = useState<CertificateTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<CertificateTemplate | null>(null)
   const [previewTemplate, setPreviewTemplate] = useState<CertificateTemplate | null>(null)
+  const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null)
+  const [downloadingTemplateId, setDownloadingTemplateId] = useState<string | null>(null)
+  const [savingTemplate, setSavingTemplate] = useState(false)
 
   /* ================= AUTH ================= */
 
@@ -103,6 +109,7 @@ export default function TemplatesPage() {
     description: string; 
     design: any 
   }) => {
+    setSavingTemplate(true)
     try {
       const isEditing = editingTemplate !== null
       const url = isEditing ? `/api/templates/${editingTemplate.id}` : '/api/templates'
@@ -134,14 +141,28 @@ export default function TemplatesPage() {
       await fetchTemplates()
       setIsEditorOpen(false)
       setEditingTemplate(null)
+      
+      toast({
+        title: `Template ${isEditing ? 'updated' : 'created'} successfully`,
+        description: `"${templateData.name}" has been ${isEditing ? 'updated' : 'created'}`,
+      })
     } catch (err) {
       console.error('Error saving template:', err)
+      toast({
+        title: `Failed to ${editingTemplate ? 'update' : 'create'} template`,
+        description: 'Please try again later',
+        variant: 'destructive'
+      })
+    } finally {
+      setSavingTemplate(false)
     }
   }
 
   const handleDeleteTemplate = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this template?')) return
+    const template = templates.find(t => t.id === id)
+    if (!confirm(`Are you sure you want to delete "${template?.name || 'this template'}"?`)) return
 
+    setDeletingTemplateId(id)
     try {
       const res = await fetch(`/api/templates/${id}`, {
         method: 'DELETE',
@@ -157,8 +178,19 @@ export default function TemplatesPage() {
       }
 
       await fetchTemplates()
+      toast({
+        title: 'Template deleted successfully',
+        description: `"${template?.name || 'Template'}" has been deleted`,
+      })
     } catch (err) {
       console.error('Error deleting template:', err)
+      toast({
+        title: 'Failed to delete template',
+        description: 'Please try again later',
+        variant: 'destructive'
+      })
+    } finally {
+      setDeletingTemplateId(null)
     }
   }
 
@@ -181,6 +213,7 @@ export default function TemplatesPage() {
   }
 
   const handleDownloadTemplate = async (template: CertificateTemplate) => {
+    setDownloadingTemplateId(template.id)
     try {
       const res = await fetch(`/api/templates/${template.id}/download`, {
         method: 'POST',
@@ -202,9 +235,20 @@ export default function TemplatesPage() {
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
+      
+      toast({
+        title: 'Template downloaded successfully',
+        description: `"${template.name}" has been downloaded`,
+      })
     } catch (err) {
       console.error('Error downloading template:', err)
-      alert('Failed to download template. Please try again.')
+      toast({
+        title: 'Failed to download template',
+        description: 'Please try again later',
+        variant: 'destructive'
+      })
+    } finally {
+      setDownloadingTemplateId(null)
     }
   }
 
@@ -274,10 +318,16 @@ export default function TemplatesPage() {
                   <Button 
                     size="sm" 
                     variant="outline"
-                    onClick={() => handleDownloadTemplate(template)}
                     className="flex-1"
+                    onClick={() => handleDownloadTemplate(template)}
+                    disabled={downloadingTemplateId === template.id}
                   >
-                    <Download className="w-4 h-4 mr-1" /> Download
+                    {downloadingTemplateId === template.id ? (
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" /> 
+                    ) : (
+                      <Download className="w-4 h-4 mr-1" /> 
+                    )}
+                    {downloadingTemplateId === template.id ? 'Downloading...' : 'Download'}
                   </Button>
                   {!template.isDefault && (
                     <Button 
@@ -285,8 +335,13 @@ export default function TemplatesPage() {
                       variant="outline"
                       onClick={() => handleDeleteTemplate(template.id)}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      disabled={deletingTemplateId === template.id}
                     >
-                      <Trash2 className="w-4 h-4" />
+                      {deletingTemplateId === template.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
                     </Button>
                   )}
                 </div>
@@ -319,6 +374,7 @@ export default function TemplatesPage() {
         onClose={handleCloseEditor}
         onSave={handleSaveTemplate}
         editingTemplate={editingTemplate}
+        saving={savingTemplate}
       />
 
       {/* Template Preview Modal */}

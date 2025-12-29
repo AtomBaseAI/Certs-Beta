@@ -116,7 +116,8 @@ export async function POST(request: NextRequest) {
             strokeWidth: 2,
             fill: "transparent"
           }
-        ])
+        ]),
+        createdBy: admin.id
       }
     })
 
