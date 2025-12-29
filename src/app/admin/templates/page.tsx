@@ -23,6 +23,7 @@ import {
 import { TemplateEditor } from '@/components/admin/TemplateEditor'
 import { TemplatePreview } from '@/components/admin/TemplatePreview'
 import { useToast } from '@/hooks/use-toast'
+import HexagonLoader from '@/components/ui/hexagon-loader'
 
 /* ================= TYPES ================= */
 
@@ -255,7 +256,11 @@ export default function TemplatesPage() {
   /* ================= RENDER ================= */
 
   if (status === 'loading' || loading) {
-    return <div className="flex justify-center p-20">Loading...</div>
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <HexagonLoader size={120} />
+      </div>
+    )
   }
 
   if (!session) return null
@@ -278,63 +283,49 @@ export default function TemplatesPage() {
 
       <main className="container mx-auto p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {templates.map(template => (
-            <Card key={template.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
+          {templates.filter(template => !template.isDefault).map(template => (
+            <Card key={template.id} className="hover:shadow-md transition-shadow flex flex-col">
+              <CardHeader className="pb-3 flex-shrink-0">
                 <div className="flex items-start justify-between">
-                  <h3 className="font-semibold text-lg leading-tight">
+                  <h3 className="font-semibold text-lg leading-tight flex-1 mr-2">
                     {template.name}
                   </h3>
                   {template.isDefault && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-xs flex-shrink-0">
                       Default
                     </Badge>
                   )}
                 </div>
                 {template.description && (
-                  <p className="text-sm text-gray-600 line-clamp-2">
+                  <p className="text-sm text-gray-600 line-clamp-2 mt-1">
                     {template.description}
                   </p>
                 )}
               </CardHeader>
-              <CardContent className="pt-0">
-                <div className="flex gap-2">
+              <CardContent className="pt-0 flex-1 flex flex-col justify-end">
+                <div className="flex flex-wrap gap-2">
                   <Button 
                     size="sm" 
                     variant="outline"
-                    className="flex-1"
                     onClick={() => handlePreviewTemplate(template)}
+                    className="flex-1 min-w-0"
                   >
                     <Eye className="w-4 h-4 mr-1" /> Preview
                   </Button>
                   <Button 
                     size="sm" 
                     variant="outline"
-                    className="flex-1"
                     onClick={() => handleEditTemplate(template)}
+                    className="flex-1 min-w-0"
                   >
                     <Edit className="w-4 h-4 mr-1" /> Edit
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => handleDownloadTemplate(template)}
-                    disabled={downloadingTemplateId === template.id}
-                  >
-                    {downloadingTemplateId === template.id ? (
-                      <Loader2 className="w-4 h-4 mr-1 animate-spin" /> 
-                    ) : (
-                      <Download className="w-4 h-4 mr-1" /> 
-                    )}
-                    {downloadingTemplateId === template.id ? 'Downloading...' : 'Download'}
                   </Button>
                   {!template.isDefault && (
                     <Button 
                       size="sm" 
                       variant="outline"
                       onClick={() => handleDeleteTemplate(template.id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 px-3"
                       disabled={deletingTemplateId === template.id}
                     >
                       {deletingTemplateId === template.id ? (
@@ -345,21 +336,37 @@ export default function TemplatesPage() {
                     </Button>
                   )}
                 </div>
+                <div className="mt-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => handleDownloadTemplate(template)}
+                    disabled={downloadingTemplateId === template.id}
+                  >
+                    {downloadingTemplateId === template.id ? (
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" /> 
+                    ) : (
+                      <Download className="w-4 h-4 mr-1" /> 
+                    )}
+                    {downloadingTemplateId === template.id ? 'Downloading...' : 'Download'}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        {templates.length === 0 && (
+        {templates.filter(template => !template.isDefault).length === 0 && (
           <div className="text-center py-12">
             <div className="text-gray-400 mb-4">
               <Settings className="w-16 h-16 mx-auto" />
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              No templates yet
+              No custom templates yet
             </h3>
             <p className="text-gray-500 mb-4">
-              Get started by creating your first certificate template
+              Default templates are hidden. Get started by creating your first custom certificate template
             </p>
             <Button onClick={() => setIsEditorOpen(true)}>
               <Plus className="w-4 h-4 mr-2" /> Create Template

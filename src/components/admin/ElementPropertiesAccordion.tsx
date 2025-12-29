@@ -16,8 +16,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
-import { Type, Square, Image as ImageIcon, Hash, Trash2, Eye, EyeOff, Lock, Unlock } from 'lucide-react'
+import { Type, Square, Image as ImageIcon, Hash, Trash2, Eye, EyeOff, Lock, Unlock, Bold, Italic, Underline } from 'lucide-react'
 
 interface TemplateElement {
   id: string
@@ -29,7 +28,10 @@ interface TemplateElement {
   content?: string
   fontSize?: number
   fontWeight?: string
+  fontFamily?: string
   textAlign?: 'left' | 'center' | 'right'
+  fontStyle?: 'normal' | 'italic'
+  textDecoration?: 'none' | 'underline'
   color?: string
   backgroundColor?: string
   borderColor?: string
@@ -68,6 +70,19 @@ export function ElementPropertiesAccordion({
     { value: 'organizationName', label: 'Organization Name' },
     { value: 'certificateId', label: 'Certificate ID' },
     { value: 'issueDate', label: 'Issue Date' }
+  ]
+
+  const fontFamilies = [
+    { value: 'Arial, sans-serif', label: 'Arial' },
+    { value: 'Helvetica, sans-serif', label: 'Helvetica' },
+    { value: 'Times New Roman, serif', label: 'Times New Roman' },
+    { value: 'Georgia, serif', label: 'Georgia' },
+    { value: 'Courier New, monospace', label: 'Courier New' },
+    { value: 'Verdana, sans-serif', label: 'Verdana' },
+    { value: 'Trebuchet MS, sans-serif', label: 'Trebuchet MS' },
+    { value: 'Palatino, serif', label: 'Palatino' },
+    { value: 'Garamond, serif', label: 'Garamond' },
+    { value: 'Comic Sans MS, cursive', label: 'Comic Sans MS' }
   ]
 
   const getElementIcon = (type: string) => {
@@ -115,37 +130,31 @@ export function ElementPropertiesAccordion({
             </div>
             <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
               {onToggleHide && (
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <div
+                  className="h-6 w-6 p-0 hover:bg-gray-100 rounded flex items-center justify-center cursor-pointer transition-colors"
                   onClick={onToggleHide}
-                  className="h-6 w-6 p-0 hover:bg-gray-100"
                   title={element.hidden ? 'Show element' : 'Hide element'}
                 >
                   {element.hidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                </Button>
+                </div>
               )}
               {onToggleLock && (
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <div
+                  className="h-6 w-6 p-0 hover:bg-gray-100 rounded flex items-center justify-center cursor-pointer transition-colors"
                   onClick={onToggleLock}
-                  className="h-6 w-6 p-0 hover:bg-gray-100"
                   title={element.locked ? 'Unlock element' : 'Lock element'}
                 >
                   {element.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                </Button>
+                </div>
               )}
               {onDelete && (
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <div
+                  className="h-6 w-6 p-0 hover:bg-red-100 text-red-600 rounded flex items-center justify-center cursor-pointer transition-colors"
                   onClick={onDelete}
-                  className="h-6 w-6 p-0 hover:bg-red-100 text-red-600"
                   title="Delete element"
                 >
                   <Trash2 className="w-3 h-3" />
-                </Button>
+                </div>
               )}
             </div>
           </div>
@@ -307,7 +316,30 @@ export function ElementPropertiesAccordion({
               </div>
 
               <div>
-                <Label htmlFor={`element-color-${element.id}`} className="text-xs">Color</Label>
+                <Label htmlFor={`element-fontfamily-${element.id}`} className="text-xs">Font Family</Label>
+                <Select
+                  value={element.fontFamily || 'Arial, sans-serif'}
+                  onValueChange={(value) => 
+                    onUpdate({
+                      fontFamily: value
+                    })
+                  }
+                >
+                  <SelectTrigger className="mt-1 h-8">
+                    <SelectValue placeholder="Select font family" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {fontFamilies.map(font => (
+                      <SelectItem key={font.value} value={font.value}>
+                        {font.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor={`element-color-${element.id}`} className="text-xs">Color & Style</Label>
                 <div className="flex gap-2 mt-1">
                   <Input
                     id={`element-color-${element.id}`}
@@ -319,15 +351,41 @@ export function ElementPropertiesAccordion({
                     disabled={element.locked}
                     className="w-12 h-8 p-1"
                   />
-                  <Input
-                    value={element.color || '#000000'}
-                    onChange={(e) => onUpdate({
-                      color: e.target.value
-                    })}
-                    disabled={element.locked}
-                    placeholder="#000000"
-                    className="flex-1 h-8"
-                  />
+                  <div className="flex gap-1">
+                    <div
+                      className={`w-8 h-8 flex items-center justify-center rounded cursor-pointer transition-colors ${
+                        element.fontWeight === 'bold' ? 'bg-gray-200 text-gray-900' : 'hover:bg-gray-100 text-gray-600'
+                      }`}
+                      onClick={() => onUpdate({
+                        fontWeight: element.fontWeight === 'bold' ? 'normal' : 'bold'
+                      })}
+                      title="Bold"
+                    >
+                      <Bold className="w-4 h-4" />
+                    </div>
+                    <div
+                      className={`w-8 h-8 flex items-center justify-center rounded cursor-pointer transition-colors ${
+                        element.fontStyle === 'italic' ? 'bg-gray-200 text-gray-900' : 'hover:bg-gray-100 text-gray-600'
+                      }`}
+                      onClick={() => onUpdate({
+                        fontStyle: element.fontStyle === 'italic' ? 'normal' : 'italic'
+                      })}
+                      title="Italic"
+                    >
+                      <Italic className="w-4 h-4" />
+                    </div>
+                    <div
+                      className={`w-8 h-8 flex items-center justify-center rounded cursor-pointer transition-colors ${
+                        element.textDecoration === 'underline' ? 'bg-gray-200 text-gray-900' : 'hover:bg-gray-100 text-gray-600'
+                      }`}
+                      onClick={() => onUpdate({
+                        textDecoration: element.textDecoration === 'underline' ? 'none' : 'underline'
+                      })}
+                      title="Underline"
+                    >
+                      <Underline className="w-4 h-4" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </>

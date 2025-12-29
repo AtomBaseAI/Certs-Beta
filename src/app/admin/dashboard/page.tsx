@@ -18,6 +18,7 @@ import {
   Calendar,
   Settings
 } from 'lucide-react'
+import HexagonLoader from '@/components/ui/hexagon-loader'
 
 export default function AdminDashboard() {
   const { data: session, status } = useSession()
@@ -71,7 +72,7 @@ export default function AdminDashboard() {
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        <HexagonLoader size={120} />
       </div>
     )
   }

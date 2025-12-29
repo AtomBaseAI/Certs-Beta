@@ -22,7 +22,10 @@ interface TemplateElement {
   content?: string
   fontSize?: number
   fontWeight?: string
+  fontFamily?: string
   textAlign?: 'left' | 'center' | 'right'
+  fontStyle?: 'normal' | 'italic'
+  textDecoration?: 'none' | 'underline'
   color?: string
   backgroundColor?: string
   borderColor?: string
@@ -169,6 +172,10 @@ export function TemplateEditor({ isOpen, onClose, onSave, editingTemplate, savin
               type === 'dynamic-text' ? '{{userName}}' : '',
       fontSize: 16,
       color: '#000000',
+      fontFamily: 'Arial, sans-serif',
+      fontWeight: 'normal',
+      fontStyle: 'normal',
+      textDecoration: 'none',
       width: type === 'rectangle' ? 100 : undefined,
       height: type === 'rectangle' ? 100 : undefined,
       backgroundColor: type === 'rectangle' ? '#f0f0f0' : undefined,

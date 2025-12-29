@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { jsPDF } from 'jspdf'
+import { createCanvas } from 'canvas'
 
 export async function POST(
   request: NextRequest,
@@ -52,22 +53,18 @@ export async function POST(
       })
     }
 
-    // Create PDF document with landscape orientation
-    const pdf = new jsPDF({
-      orientation: 'landscape',
-      unit: 'px',
-      format: [template.height || 1123, template.width || 794] // Swap width/height for landscape
-    })
+    // Create a canvas element to render the certificate
+    const canvas = createCanvas(template.width || 1123, template.height || 794)
+    const ctx = canvas.getContext('2d')
 
-    // Set background color if specified
-    if (template.backgroundColor && template.backgroundColor !== '#ffffff') {
-      pdf.setFillColor(template.backgroundColor)
-      pdf.rect(0, 0, template.height || 1123, template.width || 794, 'F') // Use landscape dimensions
-    }
+    // Set background color (always set background, even if white)
+    const bgColor = template.backgroundColor || '#ffffff'
+    ctx.fillStyle = bgColor
+    ctx.fillRect(0, 0, template.width || 1123, template.height || 794)
 
-    // Process elements
-    elements.forEach((element: any) => {
-      if (element.hidden) return
+    // Process elements and draw them on canvas
+    for (const element of elements) {
+      if (element.hidden) continue
 
       const replaceDynamicFields = (content: string) => {
         if (!content) return ''
@@ -85,82 +82,128 @@ export async function POST(
           const fontSize = element.fontSize || 12
           const color = element.color || '#000000'
           
-          // Convert hex color to RGB for jsPDF
-          const rgb = hexToRgb(color)
-          if (rgb) {
-            pdf.setTextColor(rgb.r, rgb.g, rgb.b)
+          // Set text color
+          ctx.fillStyle = color
+          
+          // Set font properties
+          let fontFamily = 'Arial'
+          if (element.fontFamily) {
+            // Map common font families to canvas-compatible fonts
+            switch (element.fontFamily) {
+              case 'Inter':
+              case 'Roboto':
+              case 'Open Sans':
+              case 'Lato':
+              case 'Montserrat':
+                fontFamily = 'Arial'
+                break
+              case 'Playfair Display':
+              case 'Merriweather':
+              case 'Crimson Text':
+                fontFamily = 'Georgia'
+                break
+              case 'Fira Code':
+              case 'Space Mono':
+                fontFamily = 'Courier New'
+                break
+              default:
+                fontFamily = 'Arial'
+            }
           }
           
-          pdf.setFontSize(fontSize)
+          let fontStyle = 'normal'
+          if (element.fontStyle === 'italic') {
+            fontStyle = 'italic'
+          }
           
-          // Set font weight
+          let fontWeight = 'normal'
           if (element.fontWeight === 'bold') {
-            pdf.setFont('helvetica', 'bold')
-          } else {
-            pdf.setFont('helvetica', 'normal')
+            fontWeight = 'bold'
           }
+          
+          ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`
           
           // Handle text alignment
-          const textWidth = pdf.getTextWidth(content)
-          let x = element.x || 0
+          ctx.textAlign = element.textAlign || 'left'
+          ctx.textBaseline = 'top'
           
-          if (element.textAlign === 'center') {
-            x = (element.x || 0) - (textWidth / 2)
-          } else if (element.textAlign === 'right') {
-            x = (element.x || 0) - textWidth
+          let x = element.x || 0
+          const y = element.y || 0
+          
+          // Add text decoration (underline)
+          if (element.textDecoration === 'underline') {
+            const textWidth = ctx.measureText(content).width
+            let underlineX = x
+            
+            if (element.textAlign === 'center') {
+              underlineX = x - (textWidth / 2)
+            } else if (element.textAlign === 'right') {
+              underlineX = x - textWidth
+            }
+            
+            ctx.strokeStyle = color
+            ctx.lineWidth = 1
+            ctx.beginPath()
+            ctx.moveTo(underlineX, y + fontSize + 2)
+            ctx.lineTo(underlineX + textWidth, y + fontSize + 2)
+            ctx.stroke()
           }
           
-          pdf.text(content, x, element.y || 0)
+          ctx.fillText(content, x, y)
           break
         
         case 'rectangle':
-          const strokeColor = element.strokeColor || '#000000'
-          const fillColor = element.fill || element.backgroundColor || 'transparent'
+          const strokeColor = element.borderColor || element.strokeColor || '#000000'
+          const fillColor = element.backgroundColor || 'transparent'
           
           // Set stroke color
-          const strokeRgb = hexToRgb(strokeColor)
-          if (strokeRgb) {
-            pdf.setDrawColor(strokeRgb.r, strokeRgb.g, strokeRgb.b)
-          }
+          ctx.strokeStyle = strokeColor
+          ctx.lineWidth = element.borderWidth || 1
           
           // Set fill color
           if (fillColor && fillColor !== 'transparent') {
-            const fillRgb = hexToRgb(fillColor)
-            if (fillRgb) {
-              pdf.setFillColor(fillRgb.r, fillRgb.g, fillRgb.b)
-            }
+            ctx.fillStyle = fillColor
           }
           
           const rectWidth = element.width || 100
           const rectHeight = element.height || 100
           const rectX = element.x || 0
           const rectY = element.y || 0
-          const strokeWidth = element.strokeWidth || 1
           
           if (fillColor && fillColor !== 'transparent') {
-            pdf.rect(rectX, rectY, rectWidth, rectHeight, 'FD')
-          } else {
-            pdf.rect(rectX, rectY, rectWidth, rectHeight, 'D')
+            ctx.fillRect(rectX, rectY, rectWidth, rectHeight)
           }
-          
-          if (strokeWidth > 1) {
-            pdf.setLineWidth(strokeWidth)
-            pdf.rect(rectX, rectY, rectWidth, rectHeight, 'D')
-          }
+          ctx.strokeRect(rectX, rectY, rectWidth, rectHeight)
           break
         
         case 'image':
           // For images, draw a placeholder rectangle
-          pdf.setDrawColor(200, 200, 200)
-          pdf.setFillColor(244, 244, 244)
-          pdf.rect(element.x || 0, element.y || 0, element.width || 100, element.height || 100, 'FD')
+          ctx.fillStyle = '#f4f4f4'
+          ctx.fillRect(element.x || 0, element.y || 0, element.width || 100, element.height || 100)
           
-          pdf.setTextColor(150, 150, 150)
-          pdf.setFontSize(10)
-          pdf.text('[Image]', (element.x || 0) + (element.width || 100) / 2 - 15, (element.y || 0) + (element.height || 100) / 2)
+          ctx.strokeStyle = '#cccccc'
+          ctx.lineWidth = 1
+          ctx.strokeRect(element.x || 0, element.y || 0, element.width || 100, element.height || 100)
+          
+          ctx.fillStyle = '#999999'
+          ctx.font = '12px Arial'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText('[Image]', (element.x || 0) + (element.width || 100) / 2, (element.y || 0) + (element.height || 100) / 2)
           break
       }
+    }
+
+    // Create PDF with proper dimensions
+    const pdf = new jsPDF({
+      orientation: template.width > template.height ? 'landscape' : 'portrait',
+      unit: 'px',
+      format: [template.width || 1123, template.height || 794]
     })
+
+    // Add the canvas as an image to PDF with full background coverage
+    const imgData = canvas.toDataURL('image/jpeg', 0.95)
+    pdf.addImage(imgData, 'JPEG', 0, 0, template.width || 1123, template.height || 794)
 
     // Generate PDF buffer
     const pdfBuffer = Buffer.from(pdf.output('arraybuffer'))

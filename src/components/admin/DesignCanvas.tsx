@@ -1,6 +1,8 @@
 'use client'
 
-import { useRef, useState, useCallback } from 'react'
+import React, { useRef, useState, useCallback } from 'react'
+import { Button } from '@/components/ui/button'
+import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface TemplateElement {
@@ -13,7 +15,10 @@ interface TemplateElement {
   content?: string
   fontSize?: number
   fontWeight?: string
+  fontFamily?: string
   textAlign?: 'left' | 'center' | 'right'
+  fontStyle?: 'normal' | 'italic'
+  textDecoration?: 'none' | 'underline'
   color?: string
   backgroundColor?: string
   borderColor?: string
@@ -47,10 +52,44 @@ export function DesignCanvas({
   onElementSelect 
 }: DesignCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isResizing, setIsResizing] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const [resizeHandle, setResizeHandle] = useState('')
+  const [zoomLevel, setZoomLevel] = useState(1)
+
+  // Calculate zoom to fit canvas in container
+  const calculateZoomToFit = useCallback(() => {
+    if (!containerRef.current || !canvasRef.current) return 1
+    
+    const container = containerRef.current
+    const containerWidth = container.clientWidth - 48 // Account for padding
+    const containerHeight = container.clientHeight - 100 // Account for controls
+    
+    const scaleX = containerWidth / design.width
+    const scaleY = containerHeight / design.height
+    const fitZoom = Math.min(scaleX, scaleY, 1) // Don't zoom in beyond 100%
+    
+    return Math.max(fitZoom, 0.3) // Minimum zoom level
+  }, [design.width, design.height])
+
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 0.1, 2))
+  }
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 0.1, 0.3))
+  }
+
+  const handleZoomToFit = () => {
+    setZoomLevel(calculateZoomToFit())
+  }
+
+  // Initialize zoom to fit when design changes
+  React.useEffect(() => {
+    setZoomLevel(calculateZoomToFit())
+  }, [calculateZoomToFit])
 
   const updateElement = useCallback((id: string, updates: Partial<TemplateElement>) => {
     onDesignChange({
@@ -76,10 +115,10 @@ export function DesignCanvas({
     onElementSelect(element)
     setIsDragging(true)
     setDragOffset({
-      x: e.clientX - rect.left - element.x,
-      y: e.clientY - rect.top - element.y
+      x: (e.clientX - rect.left) / zoomLevel - element.x,
+      y: (e.clientY - rect.top) / zoomLevel - element.y
     })
-  }, [onElementSelect])
+  }, [onElementSelect, zoomLevel])
 
   const handleResizeMouseDown = useCallback((e: React.MouseEvent, element: TemplateElement, handle: string) => {
     e.stopPropagation()
@@ -100,16 +139,16 @@ export function DesignCanvas({
     if (!rect) return
 
     if (isDragging && selectedElement) {
-      const newX = Math.max(0, Math.min(e.clientX - rect.left - dragOffset.x, design.width - 50))
-      const newY = Math.max(0, Math.min(e.clientY - rect.top - dragOffset.y, design.height - 50))
+      const newX = Math.max(0, Math.min((e.clientX - rect.left) / zoomLevel - dragOffset.x, design.width - 50))
+      const newY = Math.max(0, Math.min((e.clientY - rect.top) / zoomLevel - dragOffset.y, design.height - 50))
       
       updateElement(selectedElement.id, {
         x: newX,
         y: newY
       })
     } else if (isResizing && selectedElement) {
-      const mouseX = e.clientX - rect.left
-      const mouseY = e.clientY - rect.top
+      const mouseX = (e.clientX - rect.left) / zoomLevel
+      const mouseY = (e.clientY - rect.top) / zoomLevel
       
       let updates: Partial<TemplateElement> = {}
       
@@ -128,7 +167,7 @@ export function DesignCanvas({
       
       updateElement(selectedElement.id, updates)
     }
-  }, [isDragging, isResizing, selectedElement, dragOffset, design.width, design.height, updateElement, resizeHandle])
+  }, [isDragging, isResizing, selectedElement, dragOffset, design.width, design.height, updateElement, resizeHandle, zoomLevel])
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false)
@@ -157,6 +196,9 @@ export function DesignCanvas({
       height: element.height,
       fontSize: element.fontSize,
       fontWeight: element.fontWeight,
+      fontFamily: element.fontFamily,
+      fontStyle: element.fontStyle,
+      textDecoration: element.textDecoration,
       textAlign: element.textAlign,
       color: element.color,
       backgroundColor: element.backgroundColor,
@@ -179,7 +221,10 @@ export function DesignCanvas({
                 textAlign: element.textAlign,
                 color: element.color,
                 fontSize: element.fontSize,
-                fontWeight: element.fontWeight
+                fontWeight: element.fontWeight,
+                fontFamily: element.fontFamily,
+                fontStyle: element.fontStyle,
+                textDecoration: element.textDecoration
               }}
             >
               <div className="line-clamp-2 w-full">
@@ -256,37 +301,87 @@ export function DesignCanvas({
   }
 
   return (
-    <div className="w-full h-full p-6 overflow-auto bg-gray-100">
-      <div
-        ref={canvasRef}
-        className="relative mx-auto bg-white shadow-lg"
-        style={{
-          width: design.width,
-          height: design.height,
-          backgroundColor: design.backgroundColor,
-          backgroundImage: design.backgroundImage ? `url(${design.backgroundImage})` : 'none',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat'
-        }}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onClick={handleCanvasClick}
-      >
-        {/* Grid background */}
-        <div 
-          className="absolute inset-0 pointer-events-none opacity-10"
-          style={{
-            backgroundImage: `
-              repeating-linear-gradient(0deg, #000 0px, transparent 1px, transparent 20px, #000 21px),
-              repeating-linear-gradient(90deg, #000 0px, transparent 1px, transparent 20px, #000 21px)
-            `
-          }}
-        />
-        
-        {/* Render elements */}
-        {design.elements.map(renderElement)}
+    <div className="w-full h-full flex flex-col overflow-hidden bg-gray-100" ref={containerRef}>
+      {/* Zoom Controls */}
+      <div className="flex items-center justify-between p-3 border-b bg-white shadow-sm">
+        <div className="text-sm font-medium text-gray-600">
+          Canvas ({design.width} × {design.height}px)
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 border rounded-md p-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleZoomOut}
+              disabled={zoomLevel <= 0.3}
+              className="h-8 w-8 p-0"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </Button>
+            <span className="text-sm font-medium min-w-[60px] text-center">
+              {Math.round(zoomLevel * 100)}%
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleZoomIn}
+              disabled={zoomLevel >= 2}
+              className="h-8 w-8 p-0"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleZoomToFit}
+              className="h-8 w-8 p-0"
+              title="Fit to screen"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      {/* Canvas Container */}
+      <div className="flex-1 overflow-auto p-6">
+        <div className="flex justify-center items-center min-h-full">
+          <div className="p-[5%] border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div
+              ref={canvasRef}
+              className="relative bg-white shadow-lg transition-transform duration-200"
+              style={{
+                width: design.width,
+                height: design.height,
+                backgroundColor: design.backgroundColor,
+                backgroundImage: design.backgroundImage ? `url(${design.backgroundImage})` : 'none',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                transform: `scale(${zoomLevel})`,
+                transformOrigin: 'center',
+              }}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onClick={handleCanvasClick}
+            >
+            {/* Grid background */}
+            <div 
+              className="absolute inset-0 pointer-events-none opacity-10"
+              style={{
+                backgroundImage: `
+                  repeating-linear-gradient(0deg, #000 0px, transparent 1px, transparent 20px, #000 21px),
+                  repeating-linear-gradient(90deg, #000 0px, transparent 1px, transparent 20px, #000 21px)
+                `
+              }}
+            />
+            
+            {/* Render elements */}
+            {design.elements.map(renderElement)}
+          </div>
+          </div>
+        </div>
       </div>
     </div>
   )

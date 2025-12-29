@@ -39,7 +39,6 @@ export default function Home() {
   const resetVerification = () => {
     setVerificationCode('')
     setVerificationResult(null)
-    setIsVerifyDialogOpen(false)
   }
 
   const handleDownload = async () => {
@@ -102,18 +101,15 @@ export default function Home() {
                   <span>Verify</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="fixed inset-0 flex items-center justify-center bg-black/50 p-4 z-50">
-                <DialogHeader className="text-center">
-                  <DialogTitle className="flex items-center space-x-2 text-white">
-                    <Shield className="h-6 w-6 text-white" />
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center space-x-2">
+                    <Shield className="h-6 w-6" />
                     Verify Certificate
                   </DialogTitle>
-                  <button
-                    onClick={resetVerification}
-                    className="absolute top-4 right-4 text-white/70 hover:text-white rounded-full p-2 transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                  <DialogDescription>
+                    Enter the certificate ID to verify its authenticity
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
