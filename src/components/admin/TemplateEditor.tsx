@@ -162,11 +162,13 @@ export function TemplateEditor({ isOpen, onClose, onSave, editingTemplate, savin
 
   const handleAddElement = (type: string) => {
     const title = generateElementTitle(type, templateDesign.elements)
+    // Calculate padding (1rem = 16px at 16px base font size)
+    const padding = 1 * 16
     const newElement: TemplateElement = {
       id: `element-${Date.now()}`,
       type,
-      x: 50,
-      y: 50,
+      x: padding + 50, // Start 50px inside the padding
+      y: padding + 50, // Start 50px inside the padding
       title,
       content: type === 'text' ? title : 
               type === 'dynamic-text' ? '{{userName}}' : '',

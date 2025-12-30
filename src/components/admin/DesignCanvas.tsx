@@ -58,6 +58,7 @@ export function DesignCanvas({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const [resizeHandle, setResizeHandle] = useState('')
   const [zoomLevel, setZoomLevel] = useState(1)
+  const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 })
 
   // Calculate zoom to fit canvas in container
   const calculateZoomToFit = useCallback(() => {
@@ -112,11 +113,18 @@ export function DesignCanvas({
     const rect = canvasRef.current?.getBoundingClientRect()
     if (!rect) return
 
+    const elementX = element.x
+    const elementY = element.y
+
     onElementSelect(element)
     setIsDragging(true)
     setDragOffset({
-      x: (e.clientX - rect.left) / zoomLevel - element.x,
-      y: (e.clientY - rect.top) / zoomLevel - element.y
+      x: (e.clientX - rect.left) / zoomLevel - elementX,
+      y: (e.clientY - rect.top) / zoomLevel - elementY
+    })
+    setDragStartPos({
+      x: elementX + (element.width || 50) / 2,
+      y: elementY + (element.height || 20) / 2
     })
   }, [onElementSelect, zoomLevel])
 
@@ -138,9 +146,12 @@ export function DesignCanvas({
     const rect = canvasRef.current?.getBoundingClientRect()
     if (!rect) return
 
+    // Calculate padding (1rem = 16px at 16px base font size)
+    const padding = 1 * 16
+
     if (isDragging && selectedElement) {
-      const newX = Math.max(0, Math.min((e.clientX - rect.left) / zoomLevel - dragOffset.x, design.width - 50))
-      const newY = Math.max(0, Math.min((e.clientY - rect.top) / zoomLevel - dragOffset.y, design.height - 50))
+      const newX = Math.max(padding, Math.min((e.clientX - rect.left) / zoomLevel - dragOffset.x, design.width - 50 - padding))
+      const newY = Math.max(padding, Math.min((e.clientY - rect.top) / zoomLevel - dragOffset.y, design.height - 50 - padding))
       
       updateElement(selectedElement.id, {
         x: newX,
@@ -173,6 +184,7 @@ export function DesignCanvas({
     setIsDragging(false)
     setIsResizing(false)
     setResizeHandle('')
+    setDragStartPos({ x: 0, y: 0 })
   }, [])
 
   const handleCanvasClick = useCallback(() => {
@@ -346,10 +358,10 @@ export function DesignCanvas({
       {/* Canvas Container */}
       <div className="flex-1 overflow-auto p-6">
         <div className="flex justify-center items-center min-h-full">
-          <div className="p-[5%] border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div className="border border-gray-300 dark:border-gray-600 bg-white rounded-lg">
             <div
               ref={canvasRef}
-              className="relative bg-white shadow-lg transition-transform duration-200"
+              className="relative shadow-lg transition-transform duration-200"
               style={{
                 width: design.width,
                 height: design.height,
@@ -360,22 +372,70 @@ export function DesignCanvas({
                 backgroundRepeat: 'no-repeat',
                 transform: `scale(${zoomLevel})`,
                 transformOrigin: 'center',
+                padding: '1rem',
+                boxSizing: 'border-box'
               }}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
               onClick={handleCanvasClick}
             >
-            {/* Grid background */}
+            {/* Grid background - only in usable area */}
             <div 
-              className="absolute inset-0 pointer-events-none opacity-10"
+              className="absolute pointer-events-none opacity-10"
               style={{
+                top: '1rem',
+                left: '1rem',
+                right: '1rem',
+                bottom: '1rem',
                 backgroundImage: `
                   repeating-linear-gradient(0deg, #000 0px, transparent 1px, transparent 20px, #000 21px),
                   repeating-linear-gradient(90deg, #000 0px, transparent 1px, transparent 20px, #000 21px)
                 `
               }}
             />
+
+          {/* Center helper lines - shown when dragging */}
+            {isDragging && selectedElement && (
+              <>
+                {/* Vertical center line */}
+                <div 
+                  className="absolute pointer-events-none border-l-2 border-dashed border-blue-400 opacity-60"
+                  style={{
+                    left: `${dragStartPos.x}px`,
+                    top: '1rem',
+                    bottom: '1rem',
+                    borderLeftWidth: '2px',
+                    borderStyle: 'dashed',
+                    borderColor: 'rgb(96 165 250)', // blue-400
+                    opacity: 0.6
+                  }}
+                />
+                {/* Horizontal center line */}
+                <div 
+                  className="absolute pointer-events-none border-t-2 border-dashed border-blue-400 opacity-60"
+                  style={{
+                    top: `${dragStartPos.y}px`,
+                    left: '1rem',
+                    right: '1rem',
+                    borderTopWidth: '2px',
+                    borderStyle: 'dashed',
+                    borderColor: 'rgb(96 165 250)', // blue-400
+                    opacity: 0.6
+                  }}
+                />
+                {/* Center point indicator */}
+                <div 
+                  className="absolute pointer-events-none w-3 h-3 bg-blue-500 rounded-full opacity-80"
+                  style={{
+                    left: `${dragStartPos.x - 6}px`,
+                    top: `${dragStartPos.y - 6}px`,
+                    backgroundColor: 'rgb(59 130 246)', // blue-500
+                    opacity: 0.8
+                  }}
+                />
+              </>
+            )}
             
             {/* Render elements */}
             {design.elements.map(renderElement)}
