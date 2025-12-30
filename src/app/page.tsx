@@ -15,6 +15,7 @@ export default function Home() {
   const [isVerifying, setIsVerifying] = useState(false)
   const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
+  const [isDownloadingCert, setIsDownloadingCert] = useState(false)
 
   const handleVerify = async () => {
     if (!verificationCode.trim()) return
@@ -39,6 +40,46 @@ export default function Home() {
   const resetVerification = () => {
     setVerificationCode('')
     setVerificationResult(null)
+  }
+
+  const handleDownloadCertificate = async () => {
+    if (!verificationResult?.certificateId) return
+    
+    setIsDownloadingCert(true)
+    try {
+      const response = await fetch(`/api/certificates/${verificationResult.certificateId}/download`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to download certificate')
+      }
+      
+      // Create a blob from the response
+      const blob = await response.blob()
+      
+      // Create a temporary URL and trigger download
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `certificate-${verificationResult.certificateId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+      toast({
+        title: "Download Successful",
+        description: "Certificate downloaded successfully. Check your downloads folder.",
+      })
+    } catch (error) {
+      console.error('Certificate download error:', error)
+      toast({
+        title: "Download Failed",
+        description: "Failed to download certificate. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDownloadingCert(false)
+    }
   }
 
   const handleDownload = async () => {
@@ -92,7 +133,7 @@ export default function Home() {
           </div>
           <div className="flex items-center space-x-3">
             <div className="text-sm text-gray-600">
-              Enter certificate ID to verify authenticity
+              Enter certificate ID or verification code to verify authenticity
             </div>
             <Dialog open={isVerifyDialogOpen} onOpenChange={setIsVerifyDialogOpen}>
               <DialogTrigger asChild>
@@ -101,38 +142,51 @@ export default function Home() {
                   <span>Verify</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
+              <DialogContent className="max-w-2xl w-full">
                 <DialogHeader>
                   <DialogTitle className="flex items-center space-x-2">
                     <Shield className="h-6 w-6" />
                     Verify Certificate
                   </DialogTitle>
                   <DialogDescription>
-                    Enter the certificate ID to verify its authenticity
+                    Enter the certificate ID or verification code to verify its authenticity
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <label htmlFor="cert-id" className="text-sm font-medium text-gray-700">
-                      Certificate ID
+                      Certificate ID or Verification Code
                     </label>
                     <Input
                       id="cert-id"
-                      placeholder="Enter certificate ID..."
+                      placeholder="Enter certificate ID or verification code..."
                       value={verificationCode}
                       onChange={(e) => setVerificationCode(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && handleVerify()}
-                      className="w-full"
+                      className="w-full h-12"
                     />
                   </div>
                   
-                  <Button 
-                    onClick={handleVerify} 
-                    disabled={isVerifying || !verificationCode.trim()}
-                    className="w-full"
-                  >
-                    {isVerifying ? 'Verifying...' : 'Verify Certificate'}
-                  </Button>
+                  <div className="flex gap-3">
+                    <Button 
+                      onClick={handleVerify} 
+                      disabled={isVerifying || !verificationCode.trim()}
+                      className="flex-1"
+                    >
+                      {isVerifying ? 'Verifying...' : 'Verify Certificate'}
+                    </Button>
+                    
+                    {verificationCode.trim() && (
+                      <Button 
+                        variant="outline"
+                        onClick={resetVerification}
+                        disabled={isVerifying}
+                        className="px-4"
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
 
                   {verificationResult && (
                     <div className="mt-4">
@@ -144,39 +198,73 @@ export default function Home() {
                           </div>
                         </div>
                       ) : (
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className={`${verificationResult.status === 'revoked' ? 'bg-orange-50 border-orange-200' : 'bg-green-50 border-green-200'} rounded-lg p-4`}>
                           <div className="flex items-center space-x-2 mb-3">
-                            <CheckCircle className="h-5 w-5 text-green-600" />
-                            <h3 className="font-semibold text-green-800">Certificate Verified</h3>
-                            <Badge variant="secondary" className="ml-auto">
-                              Valid
+                            <CheckCircle className={`h-5 w-5 ${verificationResult.status === 'revoked' ? 'text-orange-600' : 'text-green-600'}`} />
+                            <h3 className={`font-semibold ${verificationResult.status === 'revoked' ? 'text-orange-800' : 'text-green-800'}`}>
+                              Certificate {verificationResult.status === 'revoked' ? 'Revoked' : 'Verified'}
+                            </h3>
+                            <Badge 
+                              variant={verificationResult.status === 'revoked' ? 'destructive' : 'secondary'} 
+                              className="ml-auto"
+                            >
+                              {verificationResult.status}
                             </Badge>
                           </div>
                           
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">User Name:</span>
-                              <span className="font-medium">{verificationResult.userName}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Program:</span>
-                              <span className="font-medium">{verificationResult.program?.name}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Organization:</span>
-                              <span className="font-medium">{verificationResult.organization?.name}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Issue Date:</span>
-                              <span className="font-medium">
-                                {new Date(verificationResult.issueDate).toLocaleDateString()}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Certificate ID:</span>
-                              <span className="font-medium font-mono">{verificationResult.certificateId}</span>
+                          <div className="space-y-4 text-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">User Name:</span>
+                                <span className="font-medium">{verificationResult.userName}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Program:</span>
+                                <span className="font-medium">{verificationResult.program?.name}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Organization:</span>
+                                <span className="font-medium">{verificationResult.organization?.name}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Issue Date:</span>
+                                <span className="font-medium">
+                                  {new Date(verificationResult.issueDate).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Certificate ID:</span>
+                                <span className="font-medium font-mono">{verificationResult.certificateId}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Verification Code:</span>
+                                <span className="font-medium font-mono">{verificationResult.verificationCode}</span>
+                              </div>
                             </div>
                           </div>
+                          
+                          {verificationResult.status === 'issued' && (
+                            <div className="mt-4 pt-4 border-t border-gray-200">
+                              <Button 
+                                onClick={handleDownloadCertificate}
+                                disabled={isDownloadingCert}
+                                className="w-full"
+                                size="lg"
+                              >
+                                {isDownloadingCert ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Downloading Certificate...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Download Certificate (PDF)
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

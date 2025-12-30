@@ -8,15 +8,15 @@ export async function GET(request: NextRequest) {
 
     if (!code) {
       return NextResponse.json(
-        { message: 'Verification code is required' },
+        { message: 'Certificate ID or verification code is required' },
         { status: 400 }
       )
     }
 
-    const certificate = await db.certificate.findUnique({
+    // Try to find certificate by certificateId first, then by verificationCode
+    let certificate = await db.certificate.findUnique({
       where: { 
-        verificationCode: code,
-        status: 'issued'
+        certificateId: code
       },
       include: {
         organization: true,
@@ -28,6 +28,24 @@ export async function GET(request: NextRequest) {
         }
       }
     })
+
+    // If not found by certificateId, try by verificationCode
+    if (!certificate) {
+      certificate = await db.certificate.findUnique({
+        where: { 
+          verificationCode: code
+        },
+        include: {
+          organization: true,
+          program: true,
+          issuer: {
+            select: {
+              name: true
+            }
+          }
+        }
+      })
+    }
 
     if (!certificate) {
       return NextResponse.json(

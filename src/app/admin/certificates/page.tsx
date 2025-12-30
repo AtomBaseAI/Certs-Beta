@@ -24,7 +24,8 @@ import {
   Upload,
   Users,
   FileText,
-  Loader2
+  Loader2,
+  Ban
 } from 'lucide-react'
 import HexagonLoader from '@/components/ui/hexagon-loader'
 import { formatDate } from '@/lib/utils'
@@ -80,6 +81,8 @@ export default function CertificatesPage() {
   const [filteredCerts, setFilteredCerts] = useState<Certificate[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [filterOrganization, setFilterOrganization] = useState('')
+  const [filterProgram, setFilterProgram] = useState('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false)
   const [selectedOrg, setSelectedOrg] = useState('')
@@ -89,11 +92,11 @@ export default function CertificatesPage() {
   const [formData, setFormData] = useState<Record<string, string>>({})
   const [dynamicFields, setDynamicFields] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isRevoking, setIsRevoking] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [isDownloading, setIsDownloading] = useState<string | null>(null)
   const [isBulkDownloading, setIsBulkDownloading] = useState(false)
   const [isBulkUploading, setIsBulkUploading] = useState(false)
-  const [isRevoking, setIsRevoking] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -108,15 +111,23 @@ export default function CertificatesPage() {
   }, [session])
 
   useEffect(() => {
-    const filtered = certificates.filter(cert =>
-      cert.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cert.userEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cert.certificateId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cert.organization.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cert.program.name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    const filtered = certificates.filter(cert => {
+      const matchesSearch = cert.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cert.userEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cert.certificateId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cert.organization.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cert.program.name.toLowerCase().includes(searchTerm.toLowerCase())
+      
+      // If "All Organizations" is selected, don't filter by organization
+      const matchesOrganization = filterOrganization === 'all' || cert.organization.id === filterOrganization
+      
+      // If "All Programs" is selected OR "All Organizations" is selected, don't filter by program
+      const matchesProgram = filterProgram === 'all' || filterOrganization === 'all' || cert.program.id === filterProgram
+      
+      return matchesSearch && matchesOrganization && matchesProgram
+    })
     setFilteredCerts(filtered)
-  }, [searchTerm, certificates])
+  }, [searchTerm, certificates, filterOrganization, filterProgram])
 
   const fetchData = async () => {
     try {
@@ -171,12 +182,28 @@ export default function CertificatesPage() {
             return true
           }
           
+          // Check for dynamic-text elements with {{fieldName}} content (missing fieldName property)
+          if (el.type === 'dynamic-text' && el.content && typeof el.content === 'string') {
+            const matches = el.content.match(/\{\{(\w+)\}\}/g)
+            if (matches) {
+              // Extract all field names from the content
+              matches.forEach(match => {
+                const fieldName = match.replace(/[{}]/g, '')
+                el.fieldName = fieldName
+              })
+              return true
+            }
+          }
+          
           // Check for text elements with {{fieldName}} content
           if (el.type === 'text' && el.content && typeof el.content === 'string') {
-            const match = el.content.match(/\{\{(\w+)\}\}/)
-            if (match && match[1]) {
-              // Store the field name for later use
-              el.fieldName = match[1]
+            const matches = el.content.match(/\{\{(\w+)\}\}/g)
+            if (matches) {
+              // Extract all field names from the content
+              matches.forEach(match => {
+                const fieldName = match.replace(/[{}]/g, '')
+                el.fieldName = fieldName
+              })
               return true
             }
           }
@@ -185,19 +212,51 @@ export default function CertificatesPage() {
         }
       )
       
-      const fields = dynamicTextElements.map((el: any) => el.fieldName)
+      const fields = dynamicTextElements.flatMap((el: any) => {
+        if (Array.isArray(el.fieldName)) {
+          return el.fieldName
+        }
+        return el.fieldName ? [el.fieldName] : []
+      })
       
-      setDynamicFields(fields)
+      // Remove duplicates
+      const uniqueFields = [...new Set(fields)]
+      
+      setDynamicFields(uniqueFields)
       
       // Initialize form data with empty values for new fields
-      const newFormData: Record<string, string> = {}
-      fields.forEach(field => {
-        if (field === 'certificateId') {
-          newFormData[field] = generateUUID() // Auto-generate UUID for certificate ID
-        } else {
-          newFormData[field] = ''
+      const newFormData: Record<string, string> = {
+        userName: '',
+        userEmail: '',
+        certificateId: generateUUID(),
+        completionDate: '',
+        programName: '',
+        organizationName: ''
+      }
+      
+      // Override with any existing form data for fields that match
+      Object.keys(formData).forEach(key => {
+        if (uniqueFields.includes(key)) {
+          newFormData[key] = formData[key] || ''
         }
       })
+      
+      // Auto-populate organization and program names if selected
+      if (selectedOrg) {
+        const org = organizations.find(o => o.id === selectedOrg)
+        if (org && uniqueFields.includes('organizationName')) {
+          newFormData.organizationName = org.name
+        }
+      }
+      
+      if (selectedProgram) {
+        const org = organizations.find(o => o.id === selectedOrg)
+        const program = org?.programs.find(p => p.id === selectedProgram)
+        if (program && uniqueFields.includes('programName')) {
+          newFormData.programName = program.name
+        }
+      }
+      
       setFormData(newFormData)
       
     } catch (error) {
@@ -240,12 +299,21 @@ export default function CertificatesPage() {
   }
 
   const resetForm = () => {
-    setFormData({ certificateId: generateUUID() }) // Always initialize with certificate ID
+    setFormData({ 
+      userName: '',
+      userEmail: '',
+      certificateId: generateUUID(),
+      completionDate: '',
+      programName: '',
+      organizationName: ''
+    })
     setDynamicFields([])
     setSelectedTemplateDetails(null)
     setSelectedOrg('')
     setSelectedProgram('')
     setSelectedTemplate('')
+    setFilterOrganization('all')
+    setFilterProgram('all')
   }
 
   const handleTemplateChange = (templateId: string) => {
@@ -256,7 +324,14 @@ export default function CertificatesPage() {
       // Reset template-specific fields
       setSelectedTemplateDetails(null)
       setDynamicFields([])
-      setFormData({ certificateId: generateUUID() }) // Keep certificate ID
+      setFormData({ 
+        userName: '',
+        userEmail: '',
+        certificateId: generateUUID(),
+        completionDate: '',
+        programName: '',
+        organizationName: ''
+      }) // Keep basic fields
     }
   }
 
@@ -290,7 +365,7 @@ export default function CertificatesPage() {
   }
 
   const isRequiredField = (fieldName: string): boolean => {
-    const requiredFields = ['userName', 'userEmail']
+    const requiredFields = ['userName']
     return requiredFields.includes(fieldName)
   }
 
@@ -399,6 +474,30 @@ export default function CertificatesPage() {
     }
   }
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to permanently delete this certificate? This action cannot be undone.')) return
+    
+    setIsDeleting(id)
+    
+    try {
+      const response = await fetch(`/api/certificates/${id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        await fetchData()
+      } else {
+        const errorData = await response.json()
+        alert(`Error: ${errorData.message || 'Failed to delete certificate'}`)
+      }
+    } catch (error) {
+      console.error('Failed to delete certificate:', error)
+      alert('Failed to delete certificate. Please try again.')
+    } finally {
+      setIsDeleting(null)
+    }
+  }
+
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -412,6 +511,11 @@ export default function CertificatesPage() {
   }
 
   const selectedOrganization = organizations.find(org => org.id === selectedOrg)
+  const availablePrograms = selectedOrganization?.programs || []
+  
+  // For filter dropdown - get programs based on selected filter organization
+  const filterSelectedOrganization = organizations.find(org => org.id === filterOrganization)
+  const filterAvailablePrograms = filterSelectedOrganization?.programs || []
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -454,15 +558,49 @@ export default function CertificatesPage() {
 
           <TabsContent value="individual" className="space-y-6">
             {/* Actions Bar */}
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-2">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              <div className="flex flex-col sm:flex-row gap-2 items-center flex-1">
                 <Search className="h-4 w-4 text-gray-500" />
                 <Input
                   placeholder="Search certificates..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-64"
+                  className="w-full sm:w-64"
                 />
+              </div>
+              
+              <div className="flex gap-2">
+                              <Select value={filterOrganization || 'all'} onValueChange={setFilterOrganization}>
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue placeholder="All Organizations" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Organizations</SelectItem>
+                    {organizations.map((org) => (
+                      <SelectItem key={org.id} value={org.id}>
+                        {org.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Select 
+                  value={filterProgram || 'all'} 
+                  onValueChange={setFilterProgram}
+                  disabled={filterOrganization === 'all' || !filterOrganization}
+                >
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue placeholder={filterOrganization === 'all' || !filterOrganization ? "Select organization first" : "All Programs"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Programs</SelectItem>
+                    {filterAvailablePrograms.map((program) => (
+                      <SelectItem key={program.id} value={program.id}>
+                        {program.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
@@ -542,9 +680,6 @@ export default function CertificatesPage() {
                       <div className="space-y-4">
                         <div className="border-t pt-4">
                           <h4 className="font-medium text-sm mb-3">Certificate Information</h4>
-                          <div className="text-xs text-gray-500 mb-2">
-                            Debug: Found {dynamicFields.length} dynamic fields: {dynamicFields.join(', ')}
-                          </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {dynamicFields.map((fieldName) => (
                               <div key={fieldName} className="space-y-2">
@@ -576,21 +711,21 @@ export default function CertificatesPage() {
                           <h4 className="font-medium text-sm mb-3">Basic Certificate Information</h4>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label htmlFor="studentName">User Name *</Label>
+                              <Label htmlFor="userName">User Name *</Label>
                               <Input
-                                id="studentName"
-                                value={formData.studentName || ''}
-                                onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
+                                id="userName"
+                                value={formData.userName || ''}
+                                onChange={(e) => setFormData({ ...formData, userName: e.target.value })}
                                 required
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="studentEmail">User Email</Label>
+                              <Label htmlFor="userEmail">User Email</Label>
                               <Input
-                                id="studentEmail"
+                                id="userEmail"
                                 type="email"
-                                value={formData.studentEmail || ''}
-                                onChange={(e) => setFormData({ ...formData, studentEmail: e.target.value })}
+                                value={formData.userEmail || ''}
+                                onChange={(e) => setFormData({ ...formData, userEmail: e.target.value })}
                               />
                             </div>
                             <div className="space-y-2">
@@ -695,7 +830,12 @@ export default function CertificatesPage() {
                             {formatDate(cert.issueDate)}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={cert.status === 'issued' ? 'default' : 'secondary'}>
+                            <Badge 
+                              variant={
+                                cert.status === 'issued' ? 'default' : 
+                                cert.status === 'revoked' ? 'destructive' : 'secondary'
+                              }
+                            >
                               {cert.status}
                             </Badge>
                           </TableCell>
@@ -705,7 +845,8 @@ export default function CertificatesPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleDownload(cert.id)}
-                                disabled={isDownloading === cert.id}
+                                disabled={isDownloading === cert.id || cert.status === 'revoked'}
+                                title={cert.status === 'revoked' ? 'Cannot download revoked certificate' : 'Download certificate'}
                               >
                                 {isDownloading === cert.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -713,21 +854,38 @@ export default function CertificatesPage() {
                                   <Download className="h-4 w-4" />
                                 )}
                               </Button>
+                              
                               {cert.status === 'issued' && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleRevoke(cert.id)}
-                                  className="text-red-600 hover:text-red-700"
+                                  className="text-orange-600 hover:text-orange-700"
                                   disabled={isRevoking === cert.id}
+                                  title="Revoke certificate"
                                 >
                                   {isRevoking === cert.id ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                   ) : (
-                                    <Trash2 className="h-4 w-4" />
+                                    <Ban className="h-4 w-4" />
                                   )}
                                 </Button>
                               )}
+                              
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(cert.id)}
+                                className="text-red-600 hover:text-red-700"
+                                disabled={isDeleting === cert.id}
+                                title="Delete certificate"
+                              >
+                                {isDeleting === cert.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
