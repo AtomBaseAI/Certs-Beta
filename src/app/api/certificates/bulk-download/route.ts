@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const csvContent = [
       'Certificate ID,User Name,User Email,Program,Organization,Issue Date,Verification Code',
       ...certificates.map(cert => 
-        `${cert.certificateId},"${cert.userName}","${cert.userEmail || ''}","${cert.program.name}","${cert.organization.name}","${cert.issueDate}","${cert.verificationCode}"`
+        `${cert.certificateId},"${cert.userName || cert.studentName}","${cert.userEmail || cert.studentEmail || ''}","${cert.program.name}","${cert.organization.name}","${cert.issueDate}","${cert.verificationCode}"`
       )
     ].join('\n')
 

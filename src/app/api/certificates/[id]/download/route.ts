@@ -81,7 +81,7 @@ export async function GET(
 
     // Certificate data
     const certificateData = {
-      userName: certificate.userName || 'Student Name',
+      userName: certificate.userName || certificate.studentName || 'Student Name',
       programName: certificate.program.name,
       organizationName: certificate.organization.name,
       completionDate: certificate.completionDate ? 
@@ -130,7 +130,7 @@ export async function GET(
         .replace(/\{\{issueDate\}\}/g, certificateData.issueDate)
         .replace(/\{\{date\}\}/g, certificateData.completionDate)
         .replace(/\{\{studentName\}\}/g, certificateData.userName)
-        .replace(/\{\{studentEmail\}\}/g, certificate.userEmail || '')
+        .replace(/\{\{studentEmail\}\}/g, certificate.userEmail || certificate.studentEmail || '')
     }
 
     // Render template elements

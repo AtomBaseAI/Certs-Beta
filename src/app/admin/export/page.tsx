@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { 
   Download, 
-  ArrowLeft,
+  ChevronLeft,
   Search,
   Filter,
   FileText,
@@ -119,8 +119,6 @@ export default function BulkExportPage() {
       })
 
       if (response.ok) {
-        const data = await response.json()
-        
         // Create a blob from the response
         const blob = await response.blob()
         
@@ -128,7 +126,18 @@ export default function BulkExportPage() {
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = data.fileName || 'certificates-export.zip'
+        
+        // Extract filename from Content-Disposition header or use default
+        const contentDisposition = response.headers.get('content-disposition')
+        let fileName = 'certificates-export.zip'
+        if (contentDisposition) {
+          const fileNameMatch = contentDisposition.match(/filename="(.+)"/)
+          if (fileNameMatch) {
+            fileName = fileNameMatch[1]
+          }
+        }
+        
+        a.download = fileName
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
@@ -226,7 +235,7 @@ export default function BulkExportPage() {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-4">
             <Button variant="ghost" onClick={() => router.push('/admin/dashboard')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ChevronLeft className="h-4 w-4 mr-2" />
               Back to Dashboard
             </Button>
             <div className="flex items-center space-x-2">

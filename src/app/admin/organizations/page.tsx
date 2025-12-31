@@ -18,7 +18,7 @@ import {
   Edit, 
   Trash2, 
   Users,
-  ArrowLeft,
+  ChevronLeft,
   Search,
   BookOpen,
   ChevronDown,
@@ -261,92 +261,92 @@ export default function OrganizationsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={() => router.push('/admin/dashboard')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-            <Building className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold text-gray-900">Organizations</h1>
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" onClick={() => router.push('/admin/dashboard')}>
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Back to Dashboard
+              </Button>
+              <Building className="h-8 w-8 text-primary" />
+              <h1 className="text-2xl font-bold text-gray-900">Organizations</h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Search className="h-4 w-4 text-gray-500" />
+                <Input
+                  placeholder="Search organizations..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-64"
+                />
+              </div>
+              
+              <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button onClick={() => {
+                    setEditingOrg(null)
+                    setFormData({ name: '', description: '' })
+                  }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Organization
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingOrg ? 'Edit Organization' : 'Create New Organization'}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {editingOrg ? 'Update organization details' : 'Add a new organization to manage programs and certificates'}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Organization Name</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        rows={3}
+                      />
+                    </div>
+                    <div className="flex justify-end space-x-2">
+                      <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            {editingOrg ? 'Updating...' : 'Creating...'}
+                          </>
+                        ) : (
+                          <>
+                            {editingOrg ? 'Update' : 'Create'}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {/* Actions Bar */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center space-x-2">
-            <Search className="h-4 w-4 text-gray-500" />
-            <Input
-              placeholder="Search organizations..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-64"
-            />
-          </div>
-          
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => {
-                setEditingOrg(null)
-                setFormData({ name: '', description: '' })
-              }}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Organization
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>
-                  {editingOrg ? 'Edit Organization' : 'Create New Organization'}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingOrg ? 'Update organization details' : 'Add a new organization to manage programs and certificates'}
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Organization Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    rows={3}
-                  />
-                </div>
-                <div className="flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        {editingOrg ? 'Updating...' : 'Creating...'}
-                      </>
-                    ) : (
-                      <>
-                        {editingOrg ? 'Update' : 'Create'}
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-
         {/* Organizations Table */}
         <Card>
           <CardHeader>
