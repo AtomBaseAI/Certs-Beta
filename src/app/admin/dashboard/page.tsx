@@ -196,7 +196,7 @@ export default function AdminDashboard() {
           <Button 
             variant="outline"
             className="h-20 flex-col space-y-2"
-            onClick={() => router.push('/admin/bulk')}
+            onClick={() => router.push('/admin/export')}
           >
             <Download className="h-6 w-6" />
             <span>Bulk Export</span>

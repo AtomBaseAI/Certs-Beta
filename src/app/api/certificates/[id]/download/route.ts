@@ -19,7 +19,25 @@ export async function GET(
     }
 
     const certificate = await db.certificate.findUnique({
-      where: { id: params.id }
+      where: { id: params.id },
+      include: {
+        organization: {
+          select: { name: true }
+        },
+        program: {
+          select: { name: true }
+        },
+        template: {
+          select: { 
+            name: true,
+            elements: true,
+            width: true,
+            height: true,
+            backgroundColor: true,
+            backgroundImage: true
+          }
+        }
+      }
     })
 
     if (!certificate) {
@@ -86,7 +104,7 @@ export async function GET(
       })
     }
 
-    // Create PDF using jsPDF
+    // Create PDF using jsPDF with template dimensions
     const pdf = new jsPDF({
       orientation: 'landscape',
       unit: 'px',
@@ -99,58 +117,118 @@ export async function GET(
       pdf.rect(0, 0, templateConfig.width, templateConfig.height, 'F')
     }
 
-    // Add border
-    pdf.setDrawColor('#000000')
-    pdf.setLineWidth(2)
-    pdf.rect(10, 10, templateConfig.width - 20, templateConfig.height - 20)
+    // Function to replace template variables
+    const replaceTemplateVariables = (content: string): string => {
+      if (!content) return ''
+      return content
+        .replace(/\{\{userName\}\}/g, certificateData.userName)
+        .replace(/\{\{programName\}\}/g, certificateData.programName)
+        .replace(/\{\{organizationName\}\}/g, certificateData.organizationName)
+        .replace(/\{\{completionDate\}\}/g, certificateData.completionDate)
+        .replace(/\{\{certificateId\}\}/g, certificateData.certificateId)
+        .replace(/\{\{verificationCode\}\}/g, certificateData.verificationCode)
+        .replace(/\{\{issueDate\}\}/g, certificateData.issueDate)
+        .replace(/\{\{date\}\}/g, certificateData.completionDate)
+        .replace(/\{\{studentName\}\}/g, certificateData.userName)
+        .replace(/\{\{studentEmail\}\}/g, certificate.userEmail || '')
+    }
 
-    // Title
-    pdf.setFontSize(32)
-    pdf.setTextColor('#1f2937')
-    pdf.text('Certificate of Completion', templateConfig.width / 2, 60, { align: 'center' })
+    // Render template elements
+    if (elements.length > 0) {
+      elements.forEach((element: any) => {
+        const { type, x, y, width, height, content, fontSize, fontWeight, textAlign, color, strokeColor, strokeWidth, fill } = element
 
-    // Subtitle
-    pdf.setFontSize(16)
-    pdf.setTextColor('#4b5563')
-    pdf.text('This is to certify that', templateConfig.width / 2, 100, { align: 'center' })
+        switch (type) {
+          case 'text':
+          case 'dynamic-text':
+            const processedContent = replaceTemplateVariables(content || '')
+            pdf.setFontSize(fontSize || 12)
+            pdf.setTextColor(color || '#000000')
+            
+            if (fontWeight === 'bold') {
+              // Try to use bold font if available
+              pdf.setFont('helvetica', 'bold')
+            } else {
+              pdf.setFont('helvetica', 'normal')
+            }
 
-    // Student Name
-    pdf.setFontSize(24)
-    pdf.setTextColor('#1f2937')
-    pdf.text(certificateData.userName, templateConfig.width / 2, 140, { align: 'center' })
+            // Handle text alignment
+            const textOptions: any = {}
+            if (textAlign === 'center') {
+              textOptions.align = 'center'
+            } else if (textAlign === 'right') {
+              textOptions.align = 'right'
+            }
 
-    // Completion text
-    pdf.setFontSize(16)
-    pdf.setTextColor('#4b5563')
-    pdf.text('has successfully completed', templateConfig.width / 2, 180, { align: 'center' })
+            // Handle multi-line text
+            const lines = processedContent.split('\n')
+            lines.forEach((line: string, index: number) => {
+              const yOffset = y + (index * (fontSize || 12) * 1.2)
+              pdf.text(line, x, yOffset, textOptions)
+            })
+            break
 
-    // Program Name
-    pdf.setFontSize(20)
-    pdf.setTextColor('#1f2937')
-    pdf.text(certificateData.programName, templateConfig.width / 2, 220, { align: 'center' })
+          case 'rectangle':
+            if (strokeColor) {
+              pdf.setDrawColor(strokeColor)
+            }
+            if (strokeWidth) {
+              pdf.setLineWidth(strokeWidth)
+            }
+            if (fill && fill !== 'transparent') {
+              pdf.setFillColor(fill)
+              pdf.rect(x, y, width || 100, height || 50, 'FD')
+            } else {
+              pdf.rect(x, y, width || 100, height || 50)
+            }
+            break
 
-    // Organization Name
-    pdf.setFontSize(16)
-    pdf.setTextColor('#6b7280')
-    pdf.text(certificateData.organizationName, templateConfig.width / 2, 280, { align: 'center' })
+          case 'image':
+            // Images would need to be handled separately
+            // For now, we'll skip image rendering in PDF
+            console.log('Image element skipped in PDF generation:', element)
+            break
+        }
+      })
+    } else {
+      // Fallback to default layout if no template elements
+      pdf.setFontSize(24)
+      pdf.setTextColor('#1f2937')
+      pdf.text('Certificate of Completion', templateConfig.width / 2, 100, { align: 'center' })
 
-    // Completion Date
-    pdf.setFontSize(14)
-    pdf.setTextColor('#6b7280')
-    pdf.text(`Completed on ${certificateData.completionDate}`, templateConfig.width / 2, 340, { align: 'center' })
+      pdf.setFontSize(14)
+      pdf.setTextColor('#4b5563')
+      pdf.text('This is to certify that', templateConfig.width / 2, 140, { align: 'center' })
 
-    // Certificate ID
-    pdf.setFontSize(12)
-    pdf.setTextColor('#9ca3af')
-    pdf.text(`Certificate ID: ${certificateData.certificateId}`, templateConfig.width / 2, 400, { align: 'center' })
+      pdf.setFontSize(20)
+      pdf.setTextColor('#1f2937')
+      pdf.text(certificateData.userName, templateConfig.width / 2, 180, { align: 'center' })
 
-    // Verification Code
-    pdf.setFontSize(12)
-    pdf.setTextColor('#9ca3af')
-    pdf.text(`Verification Code: ${certificateData.verificationCode}`, templateConfig.width / 2, 420, { align: 'center' })
+      pdf.setFontSize(16)
+      pdf.setTextColor('#1f2937')
+      pdf.text(certificateData.programName, templateConfig.width / 2, 220, { align: 'center' })
+
+      pdf.setFontSize(14)
+      pdf.setTextColor('#6b7280')
+      pdf.text(certificateData.organizationName, templateConfig.width / 2, 260, { align: 'center' })
+
+      pdf.setFontSize(12)
+      pdf.setTextColor('#6b7280')
+      pdf.text(`Completed on ${certificateData.completionDate}`, templateConfig.width / 2, 300, { align: 'center' })
+    }
 
     // Generate PDF buffer
-    const pdfBuffer = Buffer.from(pdf.output('arraybuffer'))
+    let pdfBuffer: Buffer
+    try {
+      const arrayBuffer = pdf.output('arraybuffer')
+      pdfBuffer = Buffer.from(arrayBuffer)
+    } catch (error) {
+      console.error('Error generating PDF buffer:', error)
+      return NextResponse.json(
+        { message: 'Failed to generate PDF' },
+        { status: 500 }
+      )
+    }
 
     return new NextResponse(pdfBuffer, {
       status: 200,
@@ -165,8 +243,16 @@ export async function GET(
 
   } catch (error) {
     console.error('Certificate download error:', error)
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      certificateId: params.id
+    })
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { 
+        message: 'Internal server error',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     )
   }

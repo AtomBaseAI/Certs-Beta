@@ -34,6 +34,10 @@ interface Organization {
   description: string
   logo?: string
   createdAt: string
+  programs: {
+    id: string
+    name: string
+  }[]
   _count: {
     programs: number
     certificates: number
@@ -56,10 +60,8 @@ export default function OrganizationsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [organizations, setOrganizations] = useState<Organization[]>([])
-  const [programs, setPrograms] = useState<Program[]>([])
   const [filteredOrgs, setFilteredOrgs] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
-  const [programsLoading, setProgramsLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isProgramDialogOpen, setIsProgramDialogOpen] = useState(false)
@@ -102,7 +104,7 @@ export default function OrganizationsPage() {
 
   const fetchOrganizations = async () => {
     try {
-      const response = await fetch('/api/organizations')
+      const response = await fetch('/api/organizations/with-programs')
       const data = await response.json()
       setOrganizations(data.organizations || [])
     } catch (error) {
@@ -112,41 +114,12 @@ export default function OrganizationsPage() {
     }
   }
 
-  const fetchPrograms = async (organizationId?: string) => {
-    try {
-      setProgramsLoading(true)
-      const url = organizationId 
-        ? `/api/organizations/${organizationId}/programs`
-        : '/api/programs'
-      const response = await fetch(url)
-      const data = await response.json()
-      if (organizationId) {
-        // Update programs for specific organization
-        setPrograms(prev => {
-          const filtered = prev.filter(p => p.organizationId !== organizationId)
-          return [...filtered, ...(data.programs || [])]
-        })
-      } else {
-        setPrograms(data.programs || [])
-      }
-    } catch (error) {
-      console.error('Failed to fetch programs:', error)
-    } finally {
-      setProgramsLoading(false)
-    }
-  }
-
-  const toggleOrganizationExpansion = async (orgId: string) => {
+  const toggleOrganizationExpansion = (orgId: string) => {
     const newExpanded = new Set(expandedOrgs)
     if (newExpanded.has(orgId)) {
       newExpanded.delete(orgId)
     } else {
       newExpanded.add(orgId)
-      // Fetch programs for this organization if not already loaded
-      const orgPrograms = programs.filter(p => p.organizationId === orgId)
-      if (orgPrograms.length === 0) {
-        await fetchPrograms(orgId)
-      }
     }
     setExpandedOrgs(newExpanded)
   }
@@ -222,8 +195,7 @@ export default function OrganizationsPage() {
       })
 
       if (response.ok) {
-        await fetchPrograms(selectedOrgId)
-        await fetchOrganizations() // Update counts
+        await fetchOrganizations() // Refresh organizations data to get updated programs
         setIsProgramDialogOpen(false)
         setEditingProgram(null)
         setSelectedOrgId('')
@@ -254,8 +226,7 @@ export default function OrganizationsPage() {
       })
 
       if (response.ok) {
-        await fetchPrograms()
-        await fetchOrganizations() // Update counts
+        await fetchOrganizations() // Refresh organizations data to get updated programs
       } else {
         const error = await response.json()
         alert(error.message || 'Failed to delete program')
@@ -505,63 +476,47 @@ export default function OrganizationsPage() {
                                 </Button>
                               </div>
                               
-                              {programsLoading ? (
-                                <div className="text-center py-4">
-                                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
-                                </div>
-                              ) : programs.filter(p => p.organizationId === org.id).length === 0 ? (
+                              {org.programs.length === 0 ? (
                                 <div className="text-center py-4 text-gray-500">
                                   <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
                                   <p className="text-sm">No programs yet. Add your first program to get started.</p>
                                 </div>
                               ) : (
                                 <div className="grid gap-2">
-                                  {programs
-                                    .filter(p => p.organizationId === org.id)
-                                    .map((program) => (
-                                      <div
-                                        key={program.id}
-                                        className="flex items-center justify-between p-3 bg-white rounded border border-gray-200"
-                                      >
-                                        <div className="flex-1">
-                                          <h5 className="font-medium text-sm">{program.name}</h5>
-                                          {program.description && (
-                                            <p className="text-xs text-gray-500 mt-1">{program.description}</p>
-                                          )}
-                                          <div className="flex items-center space-x-4 mt-2">
-                                            <Badge variant="outline" className="text-xs">
-                                              {program._count.certificates} certificates
-                                            </Badge>
-                                            <Badge variant="secondary" className="text-xs">
-                                              {program._count.userData} users
-                                            </Badge>
-                                          </div>
-                                        </div>
-                                        <div className="flex space-x-1">
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleEditProgram(program, org.id)}
-                                            className="h-8 w-8 p-0"
-                                          >
-                                            <Edit className="h-3 w-3" />
-                                          </Button>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleDeleteProgram(program.id)}
-                                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                                            disabled={isProgramDeleting === program.id}
-                                          >
-                                            {isProgramDeleting === program.id ? (
-                                              <Loader2 className="h-3 w-3 animate-spin" />
-                                            ) : (
-                                              <Trash2 className="h-3 w-3" />
-                                            )}
-                                          </Button>
-                                        </div>
+                                  {org.programs.map((program) => (
+                                    <div
+                                      key={program.id}
+                                      className="flex items-center justify-between p-3 bg-white rounded border border-gray-200"
+                                    >
+                                      <div className="flex-1">
+                                        <h5 className="font-medium text-sm">{program.name}</h5>
                                       </div>
-                                    ))}
+                                      <div className="flex items-center space-x-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleEditProgram(program as any, org.id)}
+                                          title="Edit Program"
+                                        >
+                                          <Edit className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleDeleteProgram(program.id)}
+                                          className="text-red-600 hover:text-red-700"
+                                          disabled={isProgramDeleting === program.id}
+                                          title="Delete Program"
+                                        >
+                                          {isProgramDeleting === program.id ? (
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                          ) : (
+                                            <Trash2 className="h-3 w-3" />
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
                               )}
                             </div>

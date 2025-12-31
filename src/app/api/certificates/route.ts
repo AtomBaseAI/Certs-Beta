@@ -18,16 +18,28 @@ export async function GET() {
     const certificates = await db.certificate.findMany({
       include: {
         organization: {
-          select: { name: true }
+          select: { 
+            id: true,
+            name: true 
+          }
         },
         program: {
-          select: { name: true }
+          select: { 
+            id: true,
+            name: true 
+          }
         },
         template: {
-          select: { name: true }
+          select: { 
+            id: true,
+            name: true 
+          }
         },
         issuer: {
-          select: { name: true }
+          select: { 
+            id: true,
+            name: true 
+          }
         }
       },
       orderBy: { createdAt: 'desc' }

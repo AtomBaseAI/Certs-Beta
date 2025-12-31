@@ -81,8 +81,8 @@ export default function CertificatesPage() {
   const [filteredCerts, setFilteredCerts] = useState<Certificate[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterOrganization, setFilterOrganization] = useState('')
-  const [filterProgram, setFilterProgram] = useState('')
+  const [filterOrganization, setFilterOrganization] = useState('all')
+  const [filterProgram, setFilterProgram] = useState('all')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false)
   const [selectedOrg, setSelectedOrg] = useState('')
@@ -110,6 +110,11 @@ export default function CertificatesPage() {
     }
   }, [session])
 
+  // Reset program filter when organization filter changes
+  useEffect(() => {
+    setFilterProgram('all')
+  }, [filterOrganization])
+
   useEffect(() => {
     const filtered = certificates.filter(cert => {
       const matchesSearch = cert.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -121,8 +126,8 @@ export default function CertificatesPage() {
       // If "All Organizations" is selected, don't filter by organization
       const matchesOrganization = filterOrganization === 'all' || cert.organization.id === filterOrganization
       
-      // If "All Programs" is selected OR "All Organizations" is selected, don't filter by program
-      const matchesProgram = filterProgram === 'all' || filterOrganization === 'all' || cert.program.id === filterProgram
+      // If "All Programs" is selected, don't filter by program
+      const matchesProgram = filterProgram === 'all' || cert.program.id === filterProgram
       
       return matchesSearch && matchesOrganization && matchesProgram
     })
@@ -424,9 +429,14 @@ export default function CertificatesPage() {
         a.click()
         window.URL.revokeObjectURL(url)
         document.body.removeChild(a)
+      } else {
+        const errorData = await response.json()
+        console.error('Download failed:', errorData)
+        alert(`Download failed: ${errorData.message || errorData.error || 'Unknown error'}`)
       }
     } catch (error) {
-      console.error('Failed to download certificate:', error)
+      console.error('Certificate download error:', error)
+      alert('Download failed. Please try again.')
     } finally {
       setIsDownloading(null)
     }

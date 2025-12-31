@@ -14,27 +14,25 @@ export async function GET() {
       )
     }
 
-    const organizations = await db.organization.findMany({
+    const exportLogs = await db.exportLog.findMany({
       include: {
-        programs: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        _count: {
-          select: {
-            programs: true,
-            certificates: true
-          }
+        creator: {
+          select: { name: true, email: true }
         }
       },
-      orderBy: { name: 'asc' }
+      orderBy: { createdAt: 'desc' },
+      take: 50 // Limit to last 50 exports
     })
 
-    return NextResponse.json({ organizations })
+    // Parse JSON filters for each log
+    const formattedLogs = exportLogs.map(log => ({
+      ...log,
+      filters: log.filters ? JSON.parse(log.filters) : null
+    }))
+
+    return NextResponse.json({ exportLogs: formattedLogs })
   } catch (error) {
-    console.error('Organizations with programs fetch error:', error)
+    console.error('Export logs fetch error:', error)
     return NextResponse.json(
       { message: 'Internal server error' },
       { status: 500 }

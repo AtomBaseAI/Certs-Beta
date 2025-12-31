@@ -157,6 +157,55 @@ async function main() {
   })
 
   console.log('✅ Sample program created:', sampleProgram.name)
+
+  // Create sample certificates
+  const sampleCertificates = [
+    {
+      certificateId: 'CERT-001',
+      userName: 'John Doe',
+      userEmail: 'john.doe@example.com',
+      verificationCode: 'ABC123DEF456',
+      organizationId: sampleOrg.id,
+      programId: sampleProgram.id,
+      templateId: defaultTemplate.id,
+      issuedBy: admin.id,
+      completionDate: new Date('2024-01-15'),
+      issueDate: new Date('2024-01-16')
+    },
+    {
+      certificateId: 'CERT-002',
+      userName: 'Jane Smith',
+      userEmail: 'jane.smith@example.com',
+      verificationCode: 'GHI789JKL012',
+      organizationId: sampleOrg.id,
+      programId: sampleProgram.id,
+      templateId: defaultTemplate.id,
+      issuedBy: admin.id,
+      completionDate: new Date('2024-02-20'),
+      issueDate: new Date('2024-02-21')
+    },
+    {
+      certificateId: 'CERT-003',
+      userName: 'Bob Johnson',
+      userEmail: 'bob.johnson@example.com',
+      verificationCode: 'MNO345PQR678',
+      organizationId: sampleOrg.id,
+      programId: sampleProgram.id,
+      templateId: defaultTemplate.id,
+      issuedBy: admin.id,
+      completionDate: new Date('2024-03-10'),
+      issueDate: new Date('2024-03-11')
+    }
+  ]
+
+  for (const certData of sampleCertificates) {
+    const certificate = await prisma.certificate.upsert({
+      where: { certificateId: certData.certificateId },
+      update: {},
+      create: certData
+    })
+    console.log('✅ Sample certificate created:', certificate.certificateId, 'for', certificate.userName)
+  }
 }
 
 main()
