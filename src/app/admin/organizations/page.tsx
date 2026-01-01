@@ -265,8 +265,7 @@ export default function OrganizationsPage() {
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
               <Button variant="ghost" onClick={() => router.push('/admin/dashboard')}>
-                <ChevronLeft className="h-4 w-4 mr-2" />
-                Back to Dashboard
+                <ChevronLeft className="h-4 w-4" />
               </Button>
               <Building className="h-8 w-8 text-primary" />
               <h1 className="text-2xl font-bold text-gray-900">Organizations</h1>

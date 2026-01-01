@@ -382,6 +382,158 @@ export default function CertificatesPage() {
     })
   }
 
+  const handleDownloadSampleCSV = async () => {
+    if (!selectedTemplate) {
+      alert('Please select a template first to generate a sample CSV')
+      return
+    }
+
+    try {
+      // Fetch template details to get dynamic fields
+      const response = await fetch(`/api/templates/${selectedTemplate}`)
+      
+      if (!response.ok) {
+        alert('Failed to fetch template details')
+        return
+      }
+      
+      const data = await response.json()
+      const template = data.template
+      
+      if (!template) {
+        alert('Template details not found')
+        return
+      }
+      
+      // Extract dynamic fields from template elements
+      const elements = template.elements || []
+      const dynamicTextElements = elements.filter((el: any) => {
+        if (el.type === 'dynamic-text' && el.fieldName) {
+          return true
+        }
+        
+        // Check for dynamic-text elements with {{fieldName}} content
+        if (el.type === 'dynamic-text' && el.content && typeof el.content === 'string') {
+          const matches = el.content.match(/\{\{(\w+)\}\}/g)
+          if (matches) {
+            matches.forEach(match => {
+              el.fieldName = match.replace(/[{}]/g, '')
+            })
+            return true
+          }
+        }
+        
+        // Check for text elements with {{fieldName}} content
+        if (el.type === 'text' && el.content && typeof el.content === 'string') {
+          const matches = el.content.match(/\{\{(\w+)\}\}/g)
+          if (matches) {
+            matches.forEach(match => {
+              el.fieldName = match.replace(/[{}]/g, '')
+            })
+            return true
+          }
+        }
+        
+        return false
+      })
+      
+      const fields = dynamicTextElements.flatMap((el: any) => {
+        if (Array.isArray(el.fieldName)) {
+          return el.fieldName
+        }
+        return el.fieldName ? [el.fieldName] : []
+      })
+      
+      // Remove duplicates and always include basic fields
+      const uniqueFields = [...new Set(fields)]
+      const csvFields = ['userName', 'userEmail', 'completionDate', ...uniqueFields.filter(f => !['userName', 'userEmail', 'completionDate'].includes(f))]
+      
+      // Generate sample data
+      const sampleData = [
+        // Header row
+        csvFields.join(','),
+        // First sample row
+        csvFields.map(field => {
+          switch (field) {
+            case 'userName':
+              return 'John Doe'
+            case 'userEmail':
+              return 'john.doe@example.com'
+            case 'completionDate':
+              return new Date().toISOString().split('T')[0] // Today's date
+            case 'certificateId':
+              return 'CERT-001'
+            case 'issueDate':
+              return new Date().toISOString().split('T')[0]
+            case 'programName':
+              const program = selectedOrganization?.programs.find(p => p.id === selectedProgram)
+              return program?.name || 'Sample Program'
+            case 'organizationName':
+              const org = organizations.find(o => o.id === selectedOrg)
+              return org?.name || 'Sample Organization'
+            case 'instructorName':
+              return 'Dr. Smith'
+            case 'courseName':
+              return 'Advanced Web Development'
+            case 'grade':
+              return 'A'
+            case 'score':
+              return '95'
+            default:
+              return `Sample ${field.charAt(0).toUpperCase() + field.slice(1)}`
+          }
+        }).join(','),
+        // Second sample row
+        csvFields.map(field => {
+          switch (field) {
+            case 'userName':
+              return 'Jane Smith'
+            case 'userEmail':
+              return 'jane.smith@example.com'
+            case 'completionDate':
+              return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // 7 days ago
+            case 'certificateId':
+              return 'CERT-002'
+            case 'issueDate':
+              return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+            case 'programName':
+              const program = selectedOrganization?.programs.find(p => p.id === selectedProgram)
+              return program?.name || 'Sample Program'
+            case 'organizationName':
+              const org = organizations.find(o => o.id === selectedOrg)
+              return org?.name || 'Sample Organization'
+            case 'instructorName':
+              return 'Prof. Johnson'
+            case 'courseName':
+              return 'Data Science Fundamentals'
+            case 'grade':
+              return 'A+'
+            case 'score':
+              return '98'
+            default:
+              return `Sample ${field.charAt(0).toUpperCase() + field.slice(1)} 2`
+          }
+        }).join(',')
+      ]
+      
+      // Create and download CSV file
+      const csvContent = sampleData.join('\n')
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `sample-csv-${template.name.replace(/\s+/g, '_').toLowerCase()}.csv`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+    } catch (error) {
+      console.error('Error generating sample CSV:', error)
+      alert('Failed to generate sample CSV. Please try again.')
+    }
+  }
+
   const handleBulkUpload = async () => {
     if (!csvFile || !selectedOrg || !selectedProgram || !selectedTemplate) {
       alert('Please fill all fields and select a CSV file')
@@ -531,44 +683,19 @@ export default function CertificatesPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={() => router.push('/admin/dashboard')}>
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-            <Award className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold text-gray-900">Certificates</h1>
-          </div>
-          <div className="flex space-x-2">
-            <Button variant="outline" onClick={handleBulkDownload} disabled={isBulkDownloading}>
-              {isBulkDownloading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Downloading...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Bulk Download
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="individual" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="individual">Individual Certificates</TabsTrigger>
-            <TabsTrigger value="bulk">Bulk Generation</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="individual" className="space-y-6">
-            {/* Actions Bar */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+            {/* Title Section */}
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" onClick={() => router.push('/admin/dashboard')}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Award className="h-8 w-8 text-primary" />
+              <h1 className="text-2xl font-bold text-gray-900">Certificates</h1>
+            </div>
+            
+            {/* Search, Filters and Issue Certificate Button */}
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
               <div className="flex flex-col sm:flex-row gap-2 items-center flex-1">
                 <Search className="h-4 w-4 text-gray-500" />
                 <Input
@@ -580,7 +707,7 @@ export default function CertificatesPage() {
               </div>
               
               <div className="flex gap-2">
-                              <Select value={filterOrganization || 'all'} onValueChange={setFilterOrganization}>
+                <Select value={filterOrganization || 'all'} onValueChange={setFilterOrganization}>
                   <SelectTrigger className="w-full sm:w-48">
                     <SelectValue placeholder="All Organizations" />
                   </SelectTrigger>
@@ -783,6 +910,19 @@ export default function CertificatesPage() {
                 </DialogContent>
               </Dialog>
             </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        <Tabs defaultValue="individual" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="individual">Individual Certificates</TabsTrigger>
+            <TabsTrigger value="bulk">Bulk Generation</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="individual" className="space-y-6">
 
             {/* Certificates Table */}
             <Card>
@@ -800,14 +940,8 @@ export default function CertificatesPage() {
                       {searchTerm ? 'No certificates found' : 'No certificates issued yet'}
                     </h3>
                     <p className="text-gray-500 mb-4">
-                      {searchTerm ? 'Try a different search term' : 'Issue your first certificate to get started'}
+                      {searchTerm ? 'Try a different search term' : 'Use the "Issue Certificate" button above to get started'}
                     </p>
-                    {!searchTerm && (
-                      <Button onClick={() => setIsCreateDialogOpen(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Issue Certificate
-                      </Button>
-                    )}
                   </div>
                 ) : (
                   <Table>
@@ -987,9 +1121,21 @@ export default function CertificatesPage() {
                       </p>
                     </label>
                   </div>
-                  <p className="text-sm text-gray-500">
-                    CSV format: userName,userEmail,completionDate (optional)
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-gray-500">
+                      CSV format: userName,userEmail,completionDate (optional)
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleDownloadSampleCSV}
+                      disabled={!selectedTemplate}
+                      className="flex items-center gap-2"
+                    >
+                      <Download className="h-4 w-4" />
+                      Download Sample CSV
+                    </Button>
+                  </div>
                 </div>
 
                 <Button 

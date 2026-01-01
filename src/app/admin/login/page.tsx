@@ -62,7 +62,7 @@ export default function AdminLogin() {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@atomcerts.com"
+                placeholder="mohanraj@atomcode.dev"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -106,14 +106,6 @@ export default function AdminLogin() {
               {isLoading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
-
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-800">
-              <strong>Demo Credentials:</strong><br />
-              Email: admin@atomcerts.com<br />
-              Password: admin123
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>

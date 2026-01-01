@@ -270,7 +270,7 @@ export default function TemplatesPage() {
       <header className="bg-white border-b p-4 flex justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" onClick={() => router.push('/admin/dashboard')}>
-            <ChevronLeft className="w-4 h-4 mr-2" /> Back to Dashboard
+            <ChevronLeft className="w-4 h-4" />
           </Button>
           <Settings className="w-6 h-6" />
           <h1 className="text-xl font-bold">Certificate Templates</h1>

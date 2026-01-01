@@ -235,8 +235,7 @@ export default function BulkExportPage() {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-4">
             <Button variant="ghost" onClick={() => router.push('/admin/dashboard')}>
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+              <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="flex items-center space-x-2">
               <Archive className="h-6 w-6 text-blue-600" />

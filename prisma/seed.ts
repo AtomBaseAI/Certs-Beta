@@ -4,29 +4,55 @@ import bcrypt from 'bcryptjs'
 const prisma = new PrismaClient()
 
 async function main() {
-  // Create admin user
-  const adminEmail = 'admin@atomcerts.com'
-  const adminPassword = 'admin123'
-  const hashedPassword = await bcrypt.hash(adminPassword, 12)
-
-  const admin = await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {
-      role: 'admin',
-      name: 'Administrator'
+  // Create admin users
+  const adminUsers = [
+    {
+      email: 'mohanraj@atomcode.dev',
+      password: 'Mr@1811321',
+      name: 'Mohanraj'
     },
-    create: {
-      email: adminEmail,
-      name: 'Administrator',
-      role: 'admin',
-      password: hashedPassword
+    {
+      email: 'gurusanthosh@atomcode.dev',
+      password: 'gurusanthosh@atomcode.dev',
+      name: 'Guru Santhosh'
+    },
+    {
+      email: 'vijaiganesh@atomcode.dev',
+      password: 'vijaiganesh@atomcode.dev',
+      name: 'Vijai Ganesh'
     }
-  })
+  ];
 
-  console.log('✅ Admin user created/updated:', admin.email)
-  console.log('📋 Login credentials:')
-  console.log('   Email:', adminEmail)
-  console.log('   Password:', adminPassword)
+  const createdAdmins = [];
+  
+  for (const adminUser of adminUsers) {
+    const hashedPassword = await bcrypt.hash(adminUser.password, 12);
+    
+    const admin = await prisma.user.upsert({
+      where: { email: adminUser.email },
+      update: {
+        role: 'admin',
+        name: adminUser.name
+      },
+      create: {
+        email: adminUser.email,
+        name: adminUser.name,
+        role: 'admin',
+        password: hashedPassword
+      }
+    });
+    
+    createdAdmins.push(admin);
+    console.log('✅ Admin user created/updated:', admin.email);
+  }
+
+  console.log('📋 Admin Login Credentials:');
+  adminUsers.forEach((user, index) => {
+    console.log(`   ${index + 1}. Email: ${user.email}, Password: ${user.password}`);
+  });
+
+  // Use the first admin for creating other resources
+  const primaryAdmin = createdAdmins[0];
 
   // Create a default certificate template
   const defaultTemplate = await prisma.certificateTemplate.upsert({
@@ -123,7 +149,7 @@ async function main() {
         }
       ]),
       isDefault: true,
-      createdBy: admin.id
+      createdBy: primaryAdmin.id
     }
   })
 
@@ -137,7 +163,7 @@ async function main() {
       id: 'sample-org',
       name: 'Sample Education Institute',
       description: 'A sample organization for demonstration purposes',
-      createdBy: admin.id
+      createdBy: primaryAdmin.id
     }
   })
 
@@ -152,7 +178,7 @@ async function main() {
       name: 'Web Development Fundamentals',
       description: 'Learn the basics of modern web development',
       organizationId: sampleOrg.id,
-      createdBy: admin.id
+      createdBy: primaryAdmin.id
     }
   })
 
@@ -168,7 +194,7 @@ async function main() {
       organizationId: sampleOrg.id,
       programId: sampleProgram.id,
       templateId: defaultTemplate.id,
-      issuedBy: admin.id,
+      issuedBy: primaryAdmin.id,
       completionDate: new Date('2024-01-15'),
       issueDate: new Date('2024-01-16')
     },
@@ -180,7 +206,7 @@ async function main() {
       organizationId: sampleOrg.id,
       programId: sampleProgram.id,
       templateId: defaultTemplate.id,
-      issuedBy: admin.id,
+      issuedBy: primaryAdmin.id,
       completionDate: new Date('2024-02-20'),
       issueDate: new Date('2024-02-21')
     },
@@ -192,7 +218,7 @@ async function main() {
       organizationId: sampleOrg.id,
       programId: sampleProgram.id,
       templateId: defaultTemplate.id,
-      issuedBy: admin.id,
+      issuedBy: primaryAdmin.id,
       completionDate: new Date('2024-03-10'),
       issueDate: new Date('2024-03-11')
     }
